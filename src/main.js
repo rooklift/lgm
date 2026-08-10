@@ -41,6 +41,7 @@ function buildMenu() {
       submenu: [
         { label: 'Fix Base Order', click: () => send('fix-base-order') },
         { label: 'Fix Pillbox Order', click: () => send('fix-pill-order') },
+        { label: 'Fix Spawn Order', click: () => send('fix-start-order') },
       ],
     },
     {

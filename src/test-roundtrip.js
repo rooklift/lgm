@@ -1,10 +1,10 @@
-/* Round-trip test: parse ../foo.map, re-serialize, compare. */
+/* Round-trip test: parse ../map_format/example.map, re-serialize, compare. */
 'use strict';
 const fs = require('fs');
 const path = require('path');
 const BoloMap = require('./format.js');
 
-const file = process.argv[2] || path.join(__dirname, '..', 'foo.map');
+const file = process.argv[2] || path.join(__dirname, '..', 'map_format', 'example.map');
 const orig = new Uint8Array(fs.readFileSync(file));
 
 const map = BoloMap.parseMap(orig);

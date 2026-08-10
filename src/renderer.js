@@ -698,6 +698,9 @@ const STATUS_SLOTS = [
   [0, 2], [1, 2], [2, 2], [3, 2], [4, 2], [5, 2],
 ];
 
+/* Spawns have no in-game status grid; order them top-to-bottom (1×16 column). */
+const SPAWN_SLOTS = Array.from({ length: 16 }, (_, i) => [0, i]);
+
 /* Hungarian algorithm (Kuhn–Munkres with potentials), rows n ≤ cols m.
  * Returns assign[i] = column chosen for row i, minimizing total cost. */
 function hungarian(cost) {
@@ -732,9 +735,9 @@ function hungarian(cost) {
   return assign;
 }
 
-/* Reorder a list so index order matches status-grid slots intuitively:
+/* Reorder a list so index order matches the given grid slots intuitively:
  * percentile-rank positions, squared-distance cost, optimal assignment. */
-function statusGridOrder(list) {
+function statusGridOrder(list, slots) {
   const n = list.length;
   const idx = [...list.keys()];
   const byX = idx.slice().sort((a, b) => list[a].x - list[b].x || list[a].y - list[b].y);
@@ -743,19 +746,21 @@ function statusGridOrder(list) {
   byX.forEach((i, r) => { rx[i] = r; });
   byY.forEach((i, r) => { ry[i] = r; });
   const span = Math.max(1, n - 1);
-  const cost = list.map((o, i) => STATUS_SLOTS.map(([sx, sy]) => {
-    const dx = (5 * rx[i]) / span - sx;
-    const dy = (2 * ry[i]) / span - sy;
+  const gw = Math.max(...slots.map(s => s[0])); /* grid extents for rank scaling */
+  const gh = Math.max(...slots.map(s => s[1]));
+  const cost = list.map((o, i) => slots.map(([sx, sy]) => {
+    const dx = (gw * rx[i]) / span - sx;
+    const dy = (gh * ry[i]) / span - sy;
     return dx * dx + dy * dy;
   }));
   const assign = hungarian(cost);
   return idx.sort((a, b) => assign[a] - assign[b]).map(i => list[i]);
 }
 
-function cmdFixOrder(listName, label) {
+function cmdFixOrder(listName, label, slots) {
   const list = doc[listName];
   if (list.length < 2) return;
-  const reordered = statusGridOrder(list);
+  const reordered = statusGridOrder(list, slots);
   if (reordered.every((o, i) => o === list[i])) {
     statusTerrain.textContent = `${label} already in status-grid order`;
     return;
@@ -841,8 +846,9 @@ api.onMenu(cmd => {
     case 'save-as': cmdSave(true); break;
     case 'undo': undo(); break;
     case 'redo': redo(); break;
-    case 'fix-base-order': cmdFixOrder('bases', 'bases'); break;
-    case 'fix-pill-order': cmdFixOrder('pills', 'pillboxes'); break;
+    case 'fix-base-order': cmdFixOrder('bases', 'bases', STATUS_SLOTS); break;
+    case 'fix-pill-order': cmdFixOrder('pills', 'pillboxes', STATUS_SLOTS); break;
+    case 'fix-start-order': cmdFixOrder('starts', 'spawns', SPAWN_SLOTS); break;
     case 'zoom-in': zoomStep(1); break;
     case 'zoom-out': zoomStep(-1); break;
     case 'zoom-fit': zoomFit(); break;
@@ -854,7 +860,10 @@ function resize() {
   const w = canvas.clientWidth, h = canvas.clientHeight;
   canvas.width = Math.max(1, Math.round(w * devicePixelRatio));
   canvas.height = Math.max(1, Math.round(h * devicePixelRatio));
-  requestDraw();
+  /* Draw synchronously: setting width/height blanks the canvas, and the
+   * ResizeObserver callback runs before paint, so an immediate draw means
+   * the blank state is never presented (a deferred rAF draw would flicker). */
+  draw();
 }
 new ResizeObserver(resize).observe(canvas);
 
