@@ -540,6 +540,14 @@ let objDrag = null; /* {type, index, undoPushed} */
 
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 
+function updateHoverStatus(t) {
+  const inMap = t.x >= 0 && t.x < MAP_SIZE && t.y >= 0 && t.y < MAP_SIZE;
+  statusPos.textContent = inMap ? `${t.x}, ${t.y}` : '';
+  statusTerrain.textContent = inMap
+    ? TERRAIN_NAMES[doc.grid[t.y * MAP_SIZE + t.x]] + (inRegion(t.x, t.y) ? '' : ' (outside saved area)')
+    : '';
+}
+
 canvas.addEventListener('pointerdown', e => {
   canvas.setPointerCapture(e.pointerId);
   const t = screenToTile(e.offsetX, e.offsetY);
@@ -596,16 +604,16 @@ canvas.addEventListener('pointerdown', e => {
         selected = { type: tool, index: idx };
         objDrag = { type: tool, index: idx, undoPushed: false };
       } else if (inRegion(t.x, t.y)) {
-        if (doc[listName].length >= 16) {
-          statusMsg(`max 16 ${OBJECT_LABEL_PLURAL[tool]} reached`);
+        if (tileOccupied(t.x, t.y)) {
+          statusMsg('tile already occupied by another object');
           return;
         }
         if (tool === 'start' && doc.grid[t.y * MAP_SIZE + t.x] !== DEEP_SEA) {
           statusMsg('spawn points must be on deep sea');
           return;
         }
-        if (tileOccupied(t.x, t.y)) {
-          statusMsg('tile already occupied by another object');
+        if (doc[listName].length >= 16) {
+          statusMsg(`max 16 ${OBJECT_LABEL_PLURAL[tool]} reached`);
           return;
         }
         pushUndo();
@@ -621,6 +629,8 @@ canvas.addEventListener('pointerdown', e => {
       requestDraw();
     }
   }
+
+  updateHoverStatus(t); /* clicks change the tile without moving the mouse */
 });
 
 canvas.addEventListener('pointermove', e => {
@@ -657,12 +667,7 @@ canvas.addEventListener('pointermove', e => {
     }
   }
 
-  /* status */
-  const inMap = t.x >= 0 && t.x < MAP_SIZE && t.y >= 0 && t.y < MAP_SIZE;
-  statusPos.textContent = inMap ? `${t.x}, ${t.y}` : '';
-  statusTerrain.textContent = inMap
-    ? TERRAIN_NAMES[doc.grid[t.y * MAP_SIZE + t.x]] + (inRegion(t.x, t.y) ? '' : ' (outside saved area)')
-    : '';
+  updateHoverStatus(t);
 });
 
 canvas.addEventListener('pointerup', () => {
