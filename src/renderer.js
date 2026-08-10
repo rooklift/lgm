@@ -146,6 +146,14 @@ function updateTitle() {
   const name = filePath ? filePath.replace(/^.*[\\/]/, '') : 'untitled.map';
   document.title = `${name}${dirty ? ' •' : ''} — Bolo Map Editor`;
 }
+/* Transient status messages hold the terrain slot for a few seconds so the
+ * mouse-over-terrain readout doesn't instantly overwrite them. */
+let statusHoldUntil = 0;
+function statusMsg(text, holdMs = 4000) {
+  statusTerrain.textContent = text;
+  statusHoldUntil = performance.now() + holdMs;
+}
+
 function updateCounts() {
   countsEl.textContent =
     `pillboxes ${doc.pills.length}/16 · bases ${doc.bases.length}/16 · spawns ${doc.starts.length}/16`;
@@ -584,15 +592,15 @@ canvas.addEventListener('pointerdown', e => {
         objDrag = { type: tool, index: idx, undoPushed: false };
       } else if (inRegion(t.x, t.y)) {
         if (doc[listName].length >= 16) {
-          statusTerrain.textContent = `max 16 ${OBJECT_LABEL_PLURAL[tool]} reached`;
+          statusMsg(`max 16 ${OBJECT_LABEL_PLURAL[tool]} reached`);
           return;
         }
         if (tool === 'start' && doc.grid[t.y * MAP_SIZE + t.x] !== DEEP_SEA) {
-          statusTerrain.textContent = 'spawn points must be on deep sea';
+          statusMsg('spawn points must be on deep sea');
           return;
         }
         if (tileOccupied(t.x, t.y)) {
-          statusTerrain.textContent = 'tile already occupied by another object';
+          statusMsg('tile already occupied by another object');
           return;
         }
         pushUndo();
@@ -628,11 +636,11 @@ canvas.addEventListener('pointermove', e => {
     const o = doc[OBJECT_LIST[objDrag.type]][objDrag.index];
     const nx = clampRegion(t.x), ny = clampRegion(t.y);
     if (objDrag.type === 'start' && doc.grid[ny * MAP_SIZE + nx] !== DEEP_SEA) {
-      statusTerrain.textContent = 'spawn points must be on deep sea';
+      statusMsg('spawn points must be on deep sea');
       return;
     }
     if (tileOccupied(nx, ny, objDrag.type, objDrag.index)) {
-      statusTerrain.textContent = 'tile already occupied by another object';
+      statusMsg('tile already occupied by another object');
       return;
     }
     if (o && (o.x !== nx || o.y !== ny)) {
@@ -644,12 +652,14 @@ canvas.addEventListener('pointermove', e => {
     }
   }
 
-  /* status */
+  /* status (hover readout defers to a held transient message) */
   const inMap = t.x >= 0 && t.x < MAP_SIZE && t.y >= 0 && t.y < MAP_SIZE;
   statusPos.textContent = inMap ? `${t.x}, ${t.y}` : '';
-  statusTerrain.textContent = inMap
-    ? TERRAIN_NAMES[doc.grid[t.y * MAP_SIZE + t.x]] + (inRegion(t.x, t.y) ? '' : ' (outside saved area)')
-    : '';
+  if (performance.now() >= statusHoldUntil) {
+    statusTerrain.textContent = inMap
+      ? TERRAIN_NAMES[doc.grid[t.y * MAP_SIZE + t.x]] + (inRegion(t.x, t.y) ? '' : ' (outside saved area)')
+      : '';
+  }
 });
 
 canvas.addEventListener('pointerup', () => {
@@ -794,7 +804,7 @@ function cmdFixOrder(listName, label, slots, quiet) {
   if (list.length < 2) return false;
   const reordered = statusGridOrder(list, slots);
   if (reordered.every((o, i) => o === list[i])) {
-    if (!quiet) statusTerrain.textContent = `${label} already in status-grid order`;
+    if (!quiet) statusMsg(`${label} already in status-grid order`);
     return false;
   }
   if (!quiet) pushUndo();
@@ -804,7 +814,7 @@ function cmdFixOrder(listName, label, slots, quiet) {
     setDirty(true);
     renderProps();
     requestDraw();
-    statusTerrain.textContent = `${label} reordered to match status grid`;
+    statusMsg(`${label} reordered to match status grid`);
   }
   return true;
 }
@@ -814,7 +824,7 @@ function cmdFixSpawnDirs(quiet) {
   if (!doc.starts.length) return false;
   const newDirs = doc.starts.map(s => spawnDirToward(s.x, s.y));
   if (newDirs.every((d, i) => d === doc.starts[i].dir)) {
-    if (!quiet) statusTerrain.textContent = 'spawn directions already correct';
+    if (!quiet) statusMsg('spawn directions already correct');
     return false;
   }
   if (!quiet) pushUndo();
@@ -823,7 +833,7 @@ function cmdFixSpawnDirs(quiet) {
     setDirty(true);
     renderProps();
     requestDraw();
-    statusTerrain.textContent = 'spawn directions re-aimed at land centre';
+    statusMsg('spawn directions re-aimed at land centre');
   }
   return true;
 }
@@ -834,7 +844,7 @@ function cmdResetObjects(type, label, quiet) {
   const defaults = OBJECT_DEFAULTS[type];
   if (!list.length) return false;
   if (list.every(o => Object.entries(defaults).every(([k, v]) => o[k] === v))) {
-    if (!quiet) statusTerrain.textContent = `${label} already at defaults`;
+    if (!quiet) statusMsg(`${label} already at defaults`);
     return false;
   }
   if (!quiet) pushUndo();
@@ -843,7 +853,7 @@ function cmdResetObjects(type, label, quiet) {
     setDirty(true);
     renderProps();
     requestDraw();
-    statusTerrain.textContent = `${label} reset to neutral defaults`;
+    statusMsg(`${label} reset to neutral defaults`);
   }
   return true;
 }
@@ -860,7 +870,7 @@ function cmdApplyAllFixes() {
     cmdResetObjects('base', 'bases', true),
   ].filter(Boolean).length;
   if (!changed) {
-    statusTerrain.textContent = 'all fixes already applied';
+    statusMsg('no fixes neede');
     return;
   }
   undoStack.push(snap);
@@ -870,7 +880,7 @@ function cmdApplyAllFixes() {
   setDirty(true);
   renderProps();
   requestDraw();
-  statusTerrain.textContent = `applied ${changed} fix${changed === 1 ? '' : 'es'}`;
+  statusMsg(`applied ${changed} fix${changed === 1 ? '' : 'es'}`);
 }
 
 /* ---------- file operations ---------- */
