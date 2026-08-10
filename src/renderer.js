@@ -866,6 +866,47 @@ function cmdResetObjects(type, label, quiet) {
   return true;
 }
 
+/* Convert every deep sea tile that touches land (orthogonally or
+ * diagonally) to river, giving coastlines a shallow-water buffer.
+ * Neighbours are read via getPos so tiles outside the saved region
+ * count as deep sea, matching what the file will actually contain.
+ * Tiles under spawn points are skipped: spawns require deep sea. */
+function cmdBufferSea(quiet) {
+  const RIVER = 1;
+  const isWater = t => t === DEEP_SEA || t === RIVER || t === 9; /* 9 = boat */
+  const toConvert = [];
+  for (let y = RGN_LO; y < RGN_HI; y++) {
+    for (let x = RGN_LO; x < RGN_HI; x++) {
+      if (doc.grid[y * MAP_SIZE + x] !== DEEP_SEA) continue;
+      if (objectAt('start', x, y) >= 0) continue;
+      let touchesLand = false;
+      for (let dy = -1; dy <= 1 && !touchesLand; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if ((dx || dy) && !isWater(BoloMap.getPos(doc.grid, x + dx, y + dy))) {
+            touchesLand = true;
+            break;
+          }
+        }
+      }
+      if (touchesLand) toConvert.push(y * MAP_SIZE + x);
+    }
+  }
+  if (!toConvert.length) {
+    if (!quiet) statusMsg('sea already buffered');
+    return false;
+  }
+  if (!quiet) pushUndo();
+  for (const i of toConvert) doc.grid[i] = RIVER;
+  rebuildOffscreen();
+  if (!quiet) {
+    setDirty(true);
+    renderProps();
+    requestDraw();
+    statusMsg(`buffered the sea: ${toConvert.length} tile${toConvert.length === 1 ? '' : 's'} converted to river`);
+  }
+  return true;
+}
+
 /* Run every fix as one undoable step. */
 function cmdApplyAllFixes() {
   const snap = snapshot();
@@ -969,6 +1010,7 @@ api.onMenu(cmd => {
     case 'fix-start-dirs': cmdFixSpawnDirs(); break;
     case 'reset-pills': cmdResetObjects('pill', 'pillboxes'); break;
     case 'reset-bases': cmdResetObjects('base', 'bases'); break;
+    case 'buffer-sea': cmdBufferSea(); break;
     case 'apply-all-fixes': cmdApplyAllFixes(); break;
     case 'zoom-in': zoomStep(1); break;
     case 'zoom-out': zoomStep(-1); break;
