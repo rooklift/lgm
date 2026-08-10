@@ -60,6 +60,8 @@ function buildMenu() {
         { label: 'Zoom out', accelerator: 'CmdOrCtrl+-', click: () => send('zoom-out') },
         { label: 'Fit map', accelerator: 'CmdOrCtrl+0', click: () => send('zoom-fit') },
         { type: 'separator' },
+        { label: 'Show pillbox range', type: 'checkbox', checked: false, click: () => send('toggle-pill-range') },
+        { type: 'separator' },
         { label: "Toggle dev tools", role: 'toggleDevTools' },
       ],
     },

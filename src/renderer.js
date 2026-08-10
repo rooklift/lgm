@@ -55,6 +55,9 @@ let tool = 'paint';
 let terrain = 7; /* grass */
 let brushSize = 1;
 let selected = null; /* {type, index} */
+let showPillRange = false;
+
+const PILL_RANGE = 8; /* tiles */
 
 const ZOOMS = [1, 2, 3, 4, 6, 8, 12, 16, 24, 32];
 const view = { zoom: 3, ox: 0, oy: 0 };
@@ -262,6 +265,17 @@ function draw() {
       ctx.lineTo(tileToScreenX(tx1), sy);
     }
     ctx.stroke();
+  }
+
+  /* pillbox range rings, under the object icons */
+  if (showPillRange) {
+    ctx.strokeStyle = 'rgba(255,59,48,0.3)';
+    ctx.lineWidth = 1.5;
+    for (const p of doc.pills) {
+      ctx.beginPath();
+      ctx.arc(tileToScreenX(p.x) + z / 2, tileToScreenY(p.y) + z / 2, PILL_RANGE * z, 0, Math.PI * 2);
+      ctx.stroke();
+    }
   }
 
   /* objects */
@@ -1037,6 +1051,7 @@ api.onMenu(cmd => {
     case 'reset-bases': cmdResetObjects('base', 'bases'); break;
     case 'buffer-sea': cmdBufferSea(); break;
     case 'apply-all-fixes': cmdApplyAllFixes(); break;
+    case 'toggle-pill-range': showPillRange = !showPillRange; requestDraw(); break;
     case 'zoom-in': zoomStep(1); break;
     case 'zoom-out': zoomStep(-1); break;
     case 'zoom-fit': zoomFit(); break;
