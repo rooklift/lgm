@@ -1232,6 +1232,11 @@ async function cmdOpen() {
 /* map passed on the command line (sent by main once the page loads) */
 api.onLoadMap(({ path, data }) => loadFromBytes(data, path));
 
+/* main defers a dirty-window close to us, for the same confirm() as New/Open */
+api.onConfirmClose(() => {
+  if (confirm('Discard unsaved changes?')) api.confirmClose();
+});
+
 /* drag & drop a .map anywhere onto the window */
 window.addEventListener('dragover', e => e.preventDefault());
 window.addEventListener('drop', async e => {

@@ -103,16 +103,12 @@ function createWindow() {
     });
   }
 
+  /* Closing a dirty window defers to the renderer, which asks with the
+   * same confirm() used by New/Open, then requests a real close. */
   win.on('close', e => {
     if (isDirty) {
-      const choice = dialog.showMessageBoxSync(win, {
-        type: 'warning',
-        buttons: ['Discard changes', 'Cancel'],
-        defaultId: 1,
-        cancelId: 1,
-        message: 'The map has unsaved changes. Discard them?',
-      });
-      if (choice === 1) e.preventDefault();
+      e.preventDefault();
+      win.webContents.send('confirm-close');
     }
   });
   win.on('closed', () => { win = null; });
@@ -151,6 +147,9 @@ ipcMain.handle('save-map', async (e, filePath, data) => {
 });
 
 ipcMain.on('set-dirty', (e, d) => { isDirty = !!d; });
+
+/* destroy() skips the 'close' event, so the dirty check can't re-fire */
+ipcMain.on('close-confirmed', () => { if (win) win.destroy(); });
 
 app.whenReady().then(() => {
   buildMenu();

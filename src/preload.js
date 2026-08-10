@@ -8,4 +8,6 @@ contextBridge.exposeInMainWorld('api', {
   saveMap: (filePath, data) => ipcRenderer.invoke('save-map', filePath, data),
   setDirty: d => ipcRenderer.send('set-dirty', d),
   onMenu: cb => ipcRenderer.on('menu-cmd', (e, cmd) => cb(cmd)),
+  onConfirmClose: cb => ipcRenderer.on('confirm-close', () => cb()),
+  confirmClose: () => ipcRenderer.send('close-confirmed'),
 });
