@@ -20,19 +20,13 @@ const TERRAIN_COLORS = {
   9:  '#a8c4ee',  /* boat on river */
   255: '#123a6b', /* deep sea */
 };
-/* Mined variants: base terrain tinted toward red so they read at any zoom */
-function minedColor(base) {
-  const c = parseInt(TERRAIN_COLORS[base].slice(1), 16);
-  const r = (c >> 16) & 255, g = (c >> 8) & 255, b = c & 255;
-  const mix = (v, t) => Math.round(v * 0.65 + t * 0.35);
-  return [mix(r, 255), mix(g, 40), mix(b, 40)];
-}
 const RGB = {};
 for (let t = 0; t <= 9; t++) {
   const c = parseInt(TERRAIN_COLORS[t].slice(1), 16);
   RGB[t] = [(c >> 16) & 255, (c >> 8) & 255, c & 255];
 }
-for (let t = 10; t <= 15; t++) RGB[t] = minedColor(t - 8);
+/* Mined variants share the base terrain colour; the red dot marks the mine */
+for (let t = 10; t <= 15; t++) RGB[t] = RGB[t - 8];
 {
   const c = parseInt(TERRAIN_COLORS[255].slice(1), 16);
   RGB[255] = [(c >> 16) & 255, (c >> 8) & 255, c & 255];
@@ -216,8 +210,9 @@ function draw() {
   const tx1 = Math.min(MAP_SIZE, Math.ceil(view.ox + w / z));
   const ty1 = Math.min(MAP_SIZE, Math.ceil(view.oy + h / z));
 
-  /* mine dots */
-  if (z >= 6) {
+  /* mine dots — the sole mine indicator, so drawn at every zoom */
+  {
+    const r = Math.max(0.5, z * 0.28);
     ctx.fillStyle = '#ff3b30';
     ctx.strokeStyle = '#7a0000';
     for (let ty = ty0; ty < ty1; ty++) {
@@ -226,9 +221,9 @@ function draw() {
         if (t >= 10 && t <= 15) {
           const cx = tileToScreenX(tx) + z / 2, cy = tileToScreenY(ty) + z / 2;
           ctx.beginPath();
-          ctx.arc(cx, cy, Math.max(2, z / 6), 0, Math.PI * 2);
+          ctx.arc(cx, cy, r, 0, Math.PI * 2);
           ctx.fill();
-          ctx.stroke();
+          if (z >= 6) ctx.stroke();
         }
       }
     }
@@ -478,15 +473,23 @@ function renderProps() {
 /* ---------- palette / tools UI ---------- */
 function buildPalette() {
   const pal = document.getElementById('palette');
-  const order = [7, 5, 2, 6, 3, 4, 0, 8, 1, 9, 255, 15, 13, 10, 14, 11, 12];
+  const order = [7, 5, 4, 2, 0, 8, 6, 3, 9, 1, 255, null,
+                 15, 13, 12, 10, null, null, 14, 11];
+                 /* nulls: mined building / mined shot building don't exist */
   for (const t of order) {
+    if (t === null) { /* spacer separating regular and mined terrain */
+      const gap = document.createElement('div');
+      gap.className = 'swatch blank';
+      pal.appendChild(gap);
+      continue;
+    }
     const sw = document.createElement('div');
     sw.className = 'swatch' + (t === terrain ? ' active' : '');
     const [r, g, b] = RGB[t];
     sw.style.background = `rgb(${r},${g},${b})`;
     sw.dataset.terrain = t;
     sw.title = TERRAIN_NAMES[t];
-    sw.textContent = TERRAIN_NAMES[t].replace('Mined ', '');
+    sw.textContent = TERRAIN_NAMES[t];
     if (t >= 10 && t <= 15) {
       const dot = document.createElement('div');
       dot.className = 'minedot';
@@ -535,16 +538,37 @@ canvas.addEventListener('pointerdown', e => {
     return;
   }
 
-  if (tool === 'paint' && (e.button === 0 || e.button === 2)) {
+  /* Right-click: delete the object under the cursor, whatever the tool.
+   * (Terrain erasing is the Deep sea swatch, not right-click.) */
+  if (e.button === 2) {
+    for (const type of Object.keys(OBJECT_LIST)) {
+      const idx = objectAt(type, t.x, t.y);
+      if (idx < 0) continue;
+      pushUndo();
+      doc[OBJECT_LIST[type]].splice(idx, 1);
+      if (selected && selected.type === type) {
+        if (selected.index === idx) selected = null;
+        else if (selected.index > idx) selected.index--;
+      }
+      setDirty(true);
+      updateCounts();
+      renderProps();
+      requestDraw();
+      break;
+    }
+    return;
+  }
+
+  if (tool === 'paint' && e.button === 0) {
     pushUndo();
     painting = true;
-    paintTerrain = e.button === 2 ? DEEP_SEA : terrain;
+    paintTerrain = terrain;
     lastTile = t;
     if (paintBrush(t.x, t.y, paintTerrain)) setDirty(true);
     requestDraw();
-  } else if (tool === 'fill' && (e.button === 0 || e.button === 2)) {
+  } else if (tool === 'fill' && e.button === 0) {
     pushUndo();
-    if (floodFill(t.x, t.y, e.button === 2 ? DEEP_SEA : terrain)) {
+    if (floodFill(t.x, t.y, terrain)) {
       setDirty(true);
       if (selected) renderProps();
     } else {
@@ -554,17 +578,7 @@ canvas.addEventListener('pointerdown', e => {
   } else if (tool === 'pill' || tool === 'base' || tool === 'start') {
     const listName = OBJECT_LIST[tool];
     const idx = objectAt(tool, t.x, t.y);
-    if (e.button === 2) {
-      if (idx >= 0) {
-        pushUndo();
-        doc[listName].splice(idx, 1);
-        if (selected && selected.type === tool && selected.index === idx) selected = null;
-        setDirty(true);
-        updateCounts();
-        renderProps();
-        requestDraw();
-      }
-    } else if (e.button === 0) {
+    if (e.button === 0) {
       if (idx >= 0) {
         selected = { type: tool, index: idx };
         objDrag = { type: tool, index: idx, undoPushed: false };
@@ -773,37 +787,90 @@ function statusGridOrder(list, slots) {
   return idx.sort((a, b) => assign[a] - assign[b]).map(i => list[i]);
 }
 
-function cmdFixOrder(listName, label, slots) {
+/* Each cmd* fix supports quiet mode: no undo/status/redraw (the caller
+ * batches those), and returns whether anything changed. */
+function cmdFixOrder(listName, label, slots, quiet) {
   const list = doc[listName];
-  if (list.length < 2) return;
+  if (list.length < 2) return false;
   const reordered = statusGridOrder(list, slots);
   if (reordered.every((o, i) => o === list[i])) {
-    statusTerrain.textContent = `${label} already in status-grid order`;
+    if (!quiet) statusTerrain.textContent = `${label} already in status-grid order`;
+    return false;
+  }
+  if (!quiet) pushUndo();
+  doc[listName] = reordered;
+  selected = null;
+  if (!quiet) {
+    setDirty(true);
+    renderProps();
+    requestDraw();
+    statusTerrain.textContent = `${label} reordered to match status grid`;
+  }
+  return true;
+}
+
+/* Re-aim every spawn at the land centre of mass (as placement does). */
+function cmdFixSpawnDirs(quiet) {
+  if (!doc.starts.length) return false;
+  const newDirs = doc.starts.map(s => spawnDirToward(s.x, s.y));
+  if (newDirs.every((d, i) => d === doc.starts[i].dir)) {
+    if (!quiet) statusTerrain.textContent = 'spawn directions already correct';
+    return false;
+  }
+  if (!quiet) pushUndo();
+  newDirs.forEach((d, i) => { doc.starts[i].dir = d; });
+  if (!quiet) {
+    setDirty(true);
+    renderProps();
+    requestDraw();
+    statusTerrain.textContent = 'spawn directions re-aimed at land centre';
+  }
+  return true;
+}
+
+/* Reset all objects of a type to neutral ownership and default stats. */
+function cmdResetObjects(type, label, quiet) {
+  const list = doc[OBJECT_LIST[type]];
+  const defaults = OBJECT_DEFAULTS[type];
+  if (!list.length) return false;
+  if (list.every(o => Object.entries(defaults).every(([k, v]) => o[k] === v))) {
+    if (!quiet) statusTerrain.textContent = `${label} already at defaults`;
+    return false;
+  }
+  if (!quiet) pushUndo();
+  for (const o of list) Object.assign(o, defaults);
+  if (!quiet) {
+    setDirty(true);
+    renderProps();
+    requestDraw();
+    statusTerrain.textContent = `${label} reset to neutral defaults`;
+  }
+  return true;
+}
+
+/* Run every fix as one undoable step. */
+function cmdApplyAllFixes() {
+  const snap = snapshot();
+  const changed = [
+    cmdFixOrder('pills', 'pillboxes', STATUS_SLOTS, true),
+    cmdFixOrder('bases', 'bases', STATUS_SLOTS, true),
+    cmdFixOrder('starts', 'spawns', SPAWN_SLOTS, true),
+    cmdFixSpawnDirs(true),
+    cmdResetObjects('pill', 'pillboxes', true),
+    cmdResetObjects('base', 'bases', true),
+  ].filter(Boolean).length;
+  if (!changed) {
+    statusTerrain.textContent = 'all fixes already applied';
     return;
   }
-  pushUndo();
-  doc[listName] = reordered;
+  undoStack.push(snap);
+  if (undoStack.length > UNDO_MAX) undoStack.shift();
+  redoStack.length = 0;
   selected = null;
   setDirty(true);
   renderProps();
   requestDraw();
-  statusTerrain.textContent = `${label} reordered to match status grid`;
-}
-
-/* Re-aim every spawn at the land centre of mass (as placement does). */
-function cmdFixSpawnDirs() {
-  if (!doc.starts.length) return;
-  const newDirs = doc.starts.map(s => spawnDirToward(s.x, s.y));
-  if (newDirs.every((d, i) => d === doc.starts[i].dir)) {
-    statusTerrain.textContent = 'spawn directions already correct';
-    return;
-  }
-  pushUndo();
-  newDirs.forEach((d, i) => { doc.starts[i].dir = d; });
-  setDirty(true);
-  renderProps();
-  requestDraw();
-  statusTerrain.textContent = 'spawn directions re-aimed at land centre';
+  statusTerrain.textContent = `applied ${changed} fix${changed === 1 ? '' : 'es'}`;
 }
 
 /* ---------- file operations ---------- */
@@ -882,6 +949,9 @@ api.onMenu(cmd => {
     case 'fix-pill-order': cmdFixOrder('pills', 'pillboxes', STATUS_SLOTS); break;
     case 'fix-start-order': cmdFixOrder('starts', 'spawns', SPAWN_SLOTS); break;
     case 'fix-start-dirs': cmdFixSpawnDirs(); break;
+    case 'reset-pills': cmdResetObjects('pill', 'pillboxes'); break;
+    case 'reset-bases': cmdResetObjects('base', 'bases'); break;
+    case 'apply-all-fixes': cmdApplyAllFixes(); break;
     case 'zoom-in': zoomStep(1); break;
     case 'zoom-out': zoomStep(-1); break;
     case 'zoom-fit': zoomFit(); break;

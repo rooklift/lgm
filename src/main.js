@@ -43,6 +43,11 @@ function buildMenu() {
         { label: 'Fix Pillbox Order', click: () => send('fix-pill-order') },
         { label: 'Fix Spawn Order', click: () => send('fix-start-order') },
         { label: 'Fix Spawn Directions', click: () => send('fix-start-dirs') },
+        { type: 'separator' },
+        { label: 'Reset Pillboxes', click: () => send('reset-pills') },
+        { label: 'Reset Bases', click: () => send('reset-bases') },
+        { type: 'separator' },
+        { label: 'Apply All Fixes', click: () => send('apply-all-fixes') },
       ],
     },
     {
