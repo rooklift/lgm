@@ -103,6 +103,7 @@ function snapshot() {
     pills: doc.pills.map(o => ({ ...o })),
     bases: doc.bases.map(o => ({ ...o })),
     starts: doc.starts.map(o => ({ ...o })),
+    selected: selected ? { ...selected } : null,
   };
 }
 function pushUndo() {
@@ -110,14 +111,17 @@ function pushUndo() {
   if (undoStack.length > UNDO_MAX) undoStack.shift();
   redoStack.length = 0;
 }
+/* The restored selection is valid by construction: it was captured in
+ * the same snapshot as the lists it indexes into. */
 function restore(snap) {
   doc.grid = snap.grid;
   doc.pills = snap.pills;
   doc.bases = snap.bases;
   doc.starts = snap.starts;
-  selected = null;
+  selected = snap.selected ? { ...snap.selected } : null;
   rebuildOffscreen();
   renderProps();
+  refreshHoverStatus();
   setDirty(true);
   requestDraw();
 }
@@ -565,8 +569,16 @@ function updateHoverStatus(t) {
     : '';
 }
 
+/* Re-check the tile under the last known mouse position, for changes
+ * that alter the map without the mouse moving (undo/redo, menu fixes). */
+let lastMouse = null;
+function refreshHoverStatus() {
+  if (lastMouse) updateHoverStatus(screenToTile(lastMouse.mx, lastMouse.my));
+}
+
 canvas.addEventListener('pointerdown', e => {
   canvas.setPointerCapture(e.pointerId);
+  lastMouse = { mx: e.offsetX, my: e.offsetY };
   const t = screenToTile(e.offsetX, e.offsetY);
 
   if (e.button === 1 || (e.button === 0 && spaceDown)) {
@@ -638,6 +650,7 @@ canvas.addEventListener('pointerdown', e => {
 });
 
 canvas.addEventListener('pointermove', e => {
+  lastMouse = { mx: e.offsetX, my: e.offsetY };
   const t = screenToTile(e.offsetX, e.offsetY);
 
   if (panning && panStart) {
@@ -825,8 +838,11 @@ function cmdFixOrder(listName, label, slots, quiet) {
     return false;
   }
   if (!quiet) pushUndo();
+  /* the selection follows its object to the object's new index */
+  if (selected && OBJECT_LIST[selected.type] === listName) {
+    selected.index = reordered.indexOf(list[selected.index]);
+  }
   doc[listName] = reordered;
-  selected = null;
   if (!quiet) {
     setDirty(true);
     renderProps();
@@ -910,6 +926,7 @@ function cmdBufferSea(quiet) {
   if (!quiet) {
     setDirty(true);
     renderProps();
+    refreshHoverStatus();
     requestDraw();
     statusMsg(`buffered the sea: ${toConvert.length} tile${toConvert.length === 1 ? '' : 's'} converted to river`);
   }
@@ -934,7 +951,6 @@ function cmdApplyAllFixes() {
   undoStack.push(snap);
   if (undoStack.length > UNDO_MAX) undoStack.shift();
   redoStack.length = 0;
-  selected = null;
   setDirty(true);
   renderProps();
   requestDraw();
