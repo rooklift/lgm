@@ -870,7 +870,7 @@ function cmdApplyAllFixes() {
     cmdResetObjects('base', 'bases', true),
   ].filter(Boolean).length;
   if (!changed) {
-    statusMsg('no fixes neede');
+    statusMsg('no fixes needed');
     return;
   }
   undoStack.push(snap);
