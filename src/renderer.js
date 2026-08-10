@@ -66,6 +66,8 @@ const UNDO_MAX = 100;
 /* ---------- DOM ---------- */
 const canvas = document.getElementById('view');
 const ctx = canvas.getContext('2d');
+const statusBar = document.getElementById('status');
+const statusMessage = document.getElementById('statusMessage');
 const statusPos = document.getElementById('statusPos');
 const statusTerrain = document.getElementById('statusTerrain');
 const statusZoom = document.getElementById('statusZoom');
@@ -146,12 +148,15 @@ function updateTitle() {
   const name = filePath ? filePath.replace(/^.*[\\/]/, '') : 'untitled.map';
   document.title = `${name}${dirty ? ' •' : ''} — Bolo Map Editor`;
 }
-/* Transient status messages hold the terrain slot for a few seconds so the
- * mouse-over-terrain readout doesn't instantly overwrite them. */
-let statusHoldUntil = 0;
-function statusMsg(text, holdMs = 4000) {
-  statusTerrain.textContent = text;
-  statusHoldUntil = performance.now() + holdMs;
+/* Transient messages live in their own full-width div (#statusMessage),
+ * which always holds the last message; showing it temporarily swaps out
+ * the whole info row. The timer only toggles visibility, never content. */
+let statusMsgTimer = null;
+function statusMsg(text, holdMs = 2500) {
+  statusMessage.textContent = text;
+  statusBar.classList.add('msg');
+  clearTimeout(statusMsgTimer);
+  statusMsgTimer = setTimeout(() => statusBar.classList.remove('msg'), holdMs);
 }
 
 function updateCounts() {
@@ -652,14 +657,12 @@ canvas.addEventListener('pointermove', e => {
     }
   }
 
-  /* status (hover readout defers to a held transient message) */
+  /* status */
   const inMap = t.x >= 0 && t.x < MAP_SIZE && t.y >= 0 && t.y < MAP_SIZE;
   statusPos.textContent = inMap ? `${t.x}, ${t.y}` : '';
-  if (performance.now() >= statusHoldUntil) {
-    statusTerrain.textContent = inMap
-      ? TERRAIN_NAMES[doc.grid[t.y * MAP_SIZE + t.x]] + (inRegion(t.x, t.y) ? '' : ' (outside saved area)')
-      : '';
-  }
+  statusTerrain.textContent = inMap
+    ? TERRAIN_NAMES[doc.grid[t.y * MAP_SIZE + t.x]] + (inRegion(t.x, t.y) ? '' : ' (outside saved area)')
+    : '';
 });
 
 canvas.addEventListener('pointerup', () => {

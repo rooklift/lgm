@@ -112,9 +112,7 @@ select, input[type="number"] {
 
 #status {
   flex: none;
-  display: flex;
   overflow: hidden;
-  gap: 18px;
   padding: 4px 10px;
   background: var(--panel);
   border-top: 1px solid var(--panel-edge);
@@ -122,6 +120,11 @@ select, input[type="number"] {
   font-size: 12px;
   white-space: nowrap;
 }
-#status span:first-child { min-width: 90px; }
+#statusInfo { display: flex; gap: 18px; overflow: hidden; }
+#statusInfo span:first-child { min-width: 90px; }
 #statusTerrain { min-width: 110px; color: var(--text); }
 #statusHint { margin-left: auto; }
+/* the two are swapped by toggling .msg on #status */
+#statusMessage { display: none; color: #ffd479; }
+#status.msg #statusInfo { display: none; }
+#status.msg #statusMessage { display: block; }
