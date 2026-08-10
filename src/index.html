@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'">
+  <title>Bolo Map Editor</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="layout">
+    <div id="sidebar">
+      <div class="panel">
+        <h2>Tools</h2>
+        <div id="tools">
+          <button class="tool active" data-tool="paint" title="Paint terrain (right-click erases to sea)">✏ Paint</button>
+          <button class="tool" data-tool="fill" title="Flood fill connected terrain">▨ Fill</button>
+          <button class="tool" data-tool="pill" title="Place / move pillboxes">◉ Pill</button>
+          <button class="tool" data-tool="base" title="Place / move bases">▣ Base</button>
+          <button class="tool" data-tool="start" title="Place / move spawns (must be on deep sea)">▲ Spawn</button>
+        </div>
+        <label class="row">Brush <select id="brushSize">
+          <option value="1">1×1</option>
+          <option value="2">2×2</option>
+          <option value="3">3×3</option>
+          <option value="5">5×5</option>
+        </select></label>
+      </div>
+
+      <div class="panel">
+        <h2>Terrain</h2>
+        <div id="palette"></div>
+      </div>
+
+      <div class="panel" id="propsPanel">
+        <h2>Selected object</h2>
+        <div id="props"><span class="hint">Click an object with its tool selected.</span></div>
+      </div>
+
+    </div>
+
+    <div id="main">
+      <canvas id="view"></canvas>
+      <div id="status">
+        <span id="statusPos"></span>
+        <span id="statusTerrain"></span>
+        <span id="statusZoom"></span>
+        <span id="counts"></span>
+        <span id="statusHint">wheel: zoom · middle-drag / space-drag: pan · right-click: erase / delete</span>
+      </div>
+    </div>
+  </div>
+  <script src="format.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{
+  "name": "bolo-map-editor",
+  "version": "0.1.0",
+  "description": "Editor for Bolo BMAPBOLO v1 map files",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node test-roundtrip.js"
+  }
+}
