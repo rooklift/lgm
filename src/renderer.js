@@ -8,10 +8,10 @@ const RGN_LO = EDGE_MIN + 1;   /* 21, inclusive */
 const RGN_HI = EDGE_MAX;       /* 236, exclusive */
 
 const TERRAIN_COLORS = {
-  0:  '#5a5a66',  /* building */
+  0:  '#8a6b4a',  /* building */
   1:  '#3f7fe0',  /* river */
   2:  '#6b7d3f',  /* swamp */
-  3:  '#8a6b4a',  /* crater */
+  3:  '#5a5a66',  /* crater */
   4:  '#3a3a3a',  /* road */
   5:  '#58a848',  /* forest */
   6:  '#857a6a',  /* rubble */
@@ -376,6 +376,21 @@ function floodFill(x, y, t) {
   return changed;
 }
 
+/* Direction (file convention: 0=E, counter-clockwise, 16 steps) from (x,y)
+ * toward the centre of mass of land; empty map falls back to map centre. */
+function spawnDirToward(x, y) {
+  let sx = 0, sy = 0, n = 0;
+  for (let ty = 0; ty < MAP_SIZE; ty++) {
+    for (let tx = 0; tx < MAP_SIZE; tx++) {
+      if (doc.grid[ty * MAP_SIZE + tx] !== DEEP_SEA) { sx += tx; sy += ty; n++; }
+    }
+  }
+  const cx = n ? sx / n : 128, cy = n ? sy / n : 128;
+  /* map y grows southward, so negate dy for a 0=east counter-clockwise angle */
+  const ang = Math.atan2(-(cy - y), cx - x);
+  return ((Math.round(ang / (Math.PI / 8)) % 16) + 16) % 16;
+}
+
 function objectAt(type, x, y) {
   return doc[OBJECT_LIST[type]].findIndex(o => o.x === x && o.y === y);
 }
@@ -568,6 +583,7 @@ canvas.addEventListener('pointerdown', e => {
         }
         pushUndo();
         const o = { x: t.x, y: t.y, ...OBJECT_DEFAULTS[tool] };
+        if (tool === 'start') o.dir = spawnDirToward(t.x, t.y);
         doc[listName].push(o);
         selected = { type: tool, index: doc[listName].length - 1 };
         objDrag = { type: tool, index: selected.index, undoPushed: true };
@@ -774,6 +790,22 @@ function cmdFixOrder(listName, label, slots) {
   statusTerrain.textContent = `${label} reordered to match status grid`;
 }
 
+/* Re-aim every spawn at the land centre of mass (as placement does). */
+function cmdFixSpawnDirs() {
+  if (!doc.starts.length) return;
+  const newDirs = doc.starts.map(s => spawnDirToward(s.x, s.y));
+  if (newDirs.every((d, i) => d === doc.starts[i].dir)) {
+    statusTerrain.textContent = 'spawn directions already correct';
+    return;
+  }
+  pushUndo();
+  newDirs.forEach((d, i) => { doc.starts[i].dir = d; });
+  setDirty(true);
+  renderProps();
+  requestDraw();
+  statusTerrain.textContent = 'spawn directions re-aimed at land centre';
+}
+
 /* ---------- file operations ---------- */
 function loadDoc(map, path) {
   doc = map;
@@ -849,6 +881,7 @@ api.onMenu(cmd => {
     case 'fix-base-order': cmdFixOrder('bases', 'bases', STATUS_SLOTS); break;
     case 'fix-pill-order': cmdFixOrder('pills', 'pillboxes', STATUS_SLOTS); break;
     case 'fix-start-order': cmdFixOrder('starts', 'spawns', SPAWN_SLOTS); break;
+    case 'fix-start-dirs': cmdFixSpawnDirs(); break;
     case 'zoom-in': zoomStep(1); break;
     case 'zoom-out': zoomStep(-1); break;
     case 'zoom-fit': zoomFit(); break;
