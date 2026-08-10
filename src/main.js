@@ -43,9 +43,11 @@ function buildMenu() {
         { label: 'Fix pillbox order', click: () => send('fix-pill-order') },
         { label: 'Fix spawn order', click: () => send('fix-start-order') },
         { label: 'Fix spawn directions', click: () => send('fix-start-dirs') },
+        /* dormant — pill/base stats are forced to defaults on save:
         { type: 'separator' },
         { label: 'Reset pillboxes', click: () => send('reset-pills') },
         { label: 'Reset bases', click: () => send('reset-bases') },
+        */
         { type: 'separator' },
         { label: 'Apply all fixes above', click: () => send('apply-all-fixes') },
         { type: 'separator' },
