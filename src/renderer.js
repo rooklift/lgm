@@ -56,6 +56,8 @@ let terrain = 7; /* grass */
 let brushSize = 1;
 let selected = null; /* {type, index} */
 let showPillRange = false;
+let symMode = null; /* null | 'h' | 'v' | 'quad' | 'rot180' | 'rot90' */
+let symParity = { x: 'odd', y: 'odd' }; /* 'odd': axis through tile 128; 'even': between 127 and 128 */
 
 const PILL_RANGE = 8; /* tiles */
 
@@ -74,6 +76,7 @@ const statusMessage = document.getElementById('statusMessage');
 const statusPos = document.getElementById('statusPos');
 const statusTerrain = document.getElementById('statusTerrain');
 const statusZoom = document.getElementById('statusZoom');
+const statusSym = document.getElementById('statusSym');
 const countsEl = document.getElementById('counts');
 const propsEl = document.getElementById('props');
 
@@ -290,6 +293,39 @@ function draw() {
   for (const [i, s] of doc.starts.entries()) {
     drawObject('start', i, s, iconR, font);
   }
+
+  /* symmetry axes / centre marker: through the middle of tile 128 for an
+   * odd axis, on the 127|128 tile boundary for an even one */
+  if (symMode) {
+    const ax = tileToScreenX(symParity.x === 'even' ? 128 : 128.5);
+    const ay = tileToScreenY(symParity.y === 'even' ? 128 : 128.5);
+    ctx.strokeStyle = 'rgba(110,190,255,0.6)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([5, 5]);
+    if (symMode === 'h' || symMode === 'quad') {
+      ctx.beginPath();
+      ctx.moveTo(ax, my0);
+      ctx.lineTo(ax, my1);
+      ctx.stroke();
+    }
+    if (symMode === 'v' || symMode === 'quad') {
+      ctx.beginPath();
+      ctx.moveTo(mx0, ay);
+      ctx.lineTo(mx1, ay);
+      ctx.stroke();
+    }
+    if (symMode === 'rot180' || symMode === 'rot90') {
+      ctx.beginPath();
+      ctx.arc(ax, ay, Math.max(9, z * 0.75), 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = 'rgba(110,190,255,0.6)';
+      ctx.beginPath();
+      ctx.arc(ax, ay, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.setLineDash([]);
+  }
 }
 
 function drawObject(type, index, o, r, font) {
@@ -353,12 +389,22 @@ function setCell(x, y, t) {
   return true;
 }
 
+/* setCell across the whole symmetry orbit of (x,y). Off-region images are
+ * rejected by setCell like any other cell (and with symmetry on, an image
+ * of an in-region cell is always in-region: the saved region maps onto
+ * itself under every mode). */
+function setCellSym(x, y, t) {
+  let changed = false;
+  for (const m of symOrbit(x, y)) changed = setCell(m.x, m.y, t) || changed;
+  return changed;
+}
+
 function paintBrush(x, y, t) {
   const o = Math.floor((brushSize - 1) / 2);
   let changed = false;
   for (let dy = 0; dy < brushSize; dy++) {
     for (let dx = 0; dx < brushSize; dx++) {
-      changed = setCell(x - o + dx, y - o + dy, t) || changed;
+      changed = setCellSym(x - o + dx, y - o + dy, t) || changed;
     }
   }
   return changed;
@@ -384,6 +430,7 @@ function floodFill(x, y, t) {
   if (target === t) return false;
   const stack = [[x, y]];
   const visited = new Uint8Array(MAP_SIZE * MAP_SIZE);
+  const filled = [];
   let changed = false;
   while (stack.length) {
     const [cx, cy] = stack.pop();
@@ -394,9 +441,24 @@ function floodFill(x, y, t) {
     /* fill flows past spawn points but leaves their deep sea untouched */
     if (t === DEEP_SEA || objectAt('start', cx, cy) < 0) {
       doc.grid[i] = t;
+      filled.push(i);
       changed = true;
     }
     stack.push([cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]);
+  }
+  /* Replicate to the symmetry images only after the traversal: painting
+   * them mid-flood would cut off a fill region that straddles an axis.
+   * Direct grid writes (setCell's rules, minus the per-pixel offscreen
+   * update) keep giant fills from doing thousands of 1px blits. */
+  if (symMode) {
+    for (const i of filled) {
+      for (const m of symOrbit(i & 0xff, i >> 8)) {
+        if (!inRegion(m.x, m.y)) continue;
+        if (t !== DEEP_SEA && objectAt('start', m.x, m.y) >= 0) continue;
+        const j = m.y * MAP_SIZE + m.x;
+        if (doc.grid[j] !== t) { doc.grid[j] = t; changed = true; }
+      }
+    }
   }
   if (changed) rebuildOffscreen();
   return changed;
@@ -450,6 +512,123 @@ function tileOccupied(x, y, exclType, exclIndex) {
     if (idx >= 0 && !(type === exclType && idx === exclIndex)) return true;
   }
   return false;
+}
+
+/* ---------- symmetry ---------- */
+function symOrbit(x, y) {
+  return BoloSym.orbit(symMode, symParity, x, y);
+}
+
+/* Bounding box of everything that isn't deep sea, plus all objects
+ * (spawns sit on deep sea, so terrain alone would miss them). */
+function contentBounds() {
+  let minX = MAP_SIZE, minY = MAP_SIZE, maxX = -1, maxY = -1;
+  for (let y = 0; y < MAP_SIZE; y++) {
+    for (let x = 0; x < MAP_SIZE; x++) {
+      if (doc.grid[y * MAP_SIZE + x] === DEEP_SEA) continue;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+  }
+  for (const listName of Object.values(OBJECT_LIST)) {
+    for (const o of doc[listName]) {
+      if (o.x < minX) minX = o.x;
+      if (o.x > maxX) maxX = o.x;
+      if (o.y < minY) minY = o.y;
+      if (o.y > maxY) maxY = o.y;
+    }
+  }
+  return maxX < 0 ? null : { minX, minY, maxX, maxY };
+}
+
+/* Best-effort recentring when symmetry is switched on: shift everything
+ * so the content straddles the centre cell (128,128). Content inside the
+ * saved region stays inside it (the centred box can't overhang, because
+ * the region itself is centred on 128). One undoable step. */
+function centreContent() {
+  const b = contentBounds();
+  if (!b) return false;
+  const { dx, dy } = BoloSym.centreShift(b, symParity);
+  if (!dx && !dy) return false;
+  pushUndo();
+  const ng = new Uint8Array(MAP_SIZE * MAP_SIZE);
+  ng.fill(DEEP_SEA);
+  for (let y = 0; y < MAP_SIZE; y++) {
+    const ny = y + dy;
+    if (ny < 0 || ny >= MAP_SIZE) continue;
+    for (let x = 0; x < MAP_SIZE; x++) {
+      const v = doc.grid[y * MAP_SIZE + x];
+      if (v === DEEP_SEA) continue;
+      const nx = x + dx;
+      if (nx >= 0 && nx < MAP_SIZE) ng[ny * MAP_SIZE + nx] = v;
+    }
+  }
+  doc.grid = ng;
+  for (const listName of Object.values(OBJECT_LIST)) {
+    for (const o of doc[listName]) { o.x += dx; o.y += dy; }
+  }
+  rebuildOffscreen();
+  setDirty(true);
+  renderProps();
+  refreshHoverStatus();
+  return true;
+}
+
+function updateSymUI() {
+  document.querySelectorAll('button.sym').forEach(b =>
+    b.classList.toggle('active', b.dataset.sym === (symMode || 'off')));
+  document.querySelectorAll('button.sympar').forEach(b => {
+    b.disabled = !symMode;
+    b.classList.toggle('active', !!symMode &&
+      symParity.x === b.dataset.parity && symParity.y === b.dataset.parity);
+  });
+  const parityNote = symParity.x === symParity.y
+    ? symParity.x
+    : `${symParity.x} x, ${symParity.y} y`;
+  statusSym.textContent = symMode
+    ? `symmetry: ${BoloSym.MODES[symMode].label} (${parityNote} axis)`
+    : '';
+}
+
+function setSymmetry(mode, quiet) {
+  if (mode === symMode) return;
+  symMode = mode;
+  if (mode) {
+    /* Every mode click re-derives the axis parity from the content and
+     * recentres, exactly as if entering from off — a manual odd/even
+     * override only lasts for the mode it was made in. */
+    const b = contentBounds();
+    symParity = b ? BoloSym.autoParity(b) : { x: 'odd', y: 'odd' };
+    /* a quarter-turn has a single centre: both axes must share a parity */
+    if (mode === 'rot90' && symParity.x !== symParity.y) {
+      symParity = { x: symParity.x, y: symParity.x };
+    }
+    updateSymUI();
+    const moved = centreContent();
+    if (!quiet) {
+      const note = symParity.x === symParity.y
+        ? `${symParity.x} axis`
+        : `mixed axis (${symParity.x} x, ${symParity.y} y)`;
+      statusMsg(`symmetry on: ${BoloSym.MODES[mode].label}, ${note}${moved ? ' — map recentred' : ''}`);
+    }
+  } else {
+    updateSymUI();
+    if (!quiet) statusMsg('symmetry off');
+  }
+  requestDraw();
+}
+
+/* Manual axis-parity override (sets both axes; recentres to match). */
+function setParity(p) {
+  if (!symMode) return;
+  if (symParity.x === p && symParity.y === p) return;
+  symParity = { x: p, y: p };
+  updateSymUI();
+  const moved = centreContent();
+  statusMsg(`symmetry axis: ${p === 'odd' ? 'through tile 128' : 'between tiles 127 and 128'}${moved ? ' — map recentred' : ''}`);
+  requestDraw();
 }
 
 /* ---------- properties panel ---------- */
@@ -560,6 +739,11 @@ function setTool(t) {
 }
 document.querySelectorAll('button.tool').forEach(b =>
   b.addEventListener('click', () => setTool(b.dataset.tool)));
+document.querySelectorAll('button.sym').forEach(b =>
+  b.addEventListener('click', () =>
+    setSymmetry(b.dataset.sym === 'off' ? null : b.dataset.sym)));
+document.querySelectorAll('button.sympar').forEach(b =>
+  b.addEventListener('click', () => setParity(b.dataset.parity)));
 document.getElementById('brushSize').addEventListener('change', e => {
   brushSize = Number(e.target.value);
 });
@@ -642,16 +826,41 @@ canvas.addEventListener('pointerdown', e => {
           statusMsg('spawn points must be on deep sea');
           return;
         }
-        if (doc[listName].length >= 16) {
-          statusMsg(`max 16 ${OBJECT_LABEL_PLURAL[tool]} reached`);
+        const orbit = symOrbit(t.x, t.y);
+        if (doc[listName].length + orbit.length > 16) {
+          statusMsg(orbit.length > 1
+            ? `no room for ${orbit.length} mirrored ${OBJECT_LABEL_PLURAL[tool]} — nothing placed`
+            : `max 16 ${OBJECT_LABEL_PLURAL[tool]} reached`);
           return;
         }
+        /* all-or-nothing: any bad mirror position vetoes the placement */
+        for (const m of orbit.slice(1)) {
+          if (!inRegion(m.x, m.y)) {
+            /* only reachable with an even axis, whose far edge has no image */
+            statusMsg(`mirrored tile (${m.x}, ${m.y}) is outside the saved area — nothing placed`);
+            return;
+          }
+          if (objectAtAnyType(m.x, m.y)) {
+            statusMsg(`mirrored tile (${m.x}, ${m.y}) already occupied — nothing placed`);
+            return;
+          }
+          if (tool === 'start' && doc.grid[m.y * MAP_SIZE + m.x] !== DEEP_SEA) {
+            statusMsg(`mirrored tile (${m.x}, ${m.y}) is not deep sea — nothing placed`);
+            return;
+          }
+        }
         pushUndo();
-        const o = { x: t.x, y: t.y, ...OBJECT_DEFAULTS[tool] };
-        if (tool === 'start') o.dir = spawnDirToward(t.x, t.y);
-        doc[listName].push(o);
-        selected = { type: tool, index: doc[listName].length - 1 };
-        objDrag = { type: tool, index: selected.index, undoPushed: true };
+        const baseDir = tool === 'start' ? spawnDirToward(t.x, t.y) : 0;
+        for (const m of orbit) {
+          const o = { x: m.x, y: m.y, ...OBJECT_DEFAULTS[tool] };
+          if (tool === 'start') o.dir = m.dir(baseDir);
+          doc[listName].push(o);
+        }
+        selected = { type: tool, index: doc[listName].length - orbit.length };
+        /* drag-after-place only when there are no mirror copies to desync */
+        objDrag = orbit.length === 1
+          ? { type: tool, index: selected.index, undoPushed: true }
+          : null;
         setDirty(true);
         updateCounts();
       }
@@ -976,6 +1185,7 @@ function loadDoc(map, path) {
   doc = map;
   filePath = path;
   selected = null;
+  setSymmetry(null, true); /* a fresh document starts unsymmetric */
   undoStack.length = 0;
   redoStack.length = 0;
   rebuildOffscreen();
@@ -1073,6 +1283,7 @@ new ResizeObserver(resize).observe(canvas);
 buildPalette();
 rebuildOffscreen();
 updateCounts();
+updateSymUI();
 renderProps();
 updateTitle();
 statusZoom.textContent = `zoom ${view.zoom}×`;

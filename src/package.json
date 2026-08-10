@@ -5,6 +5,6 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "test": "node test-roundtrip.js"
+    "test": "node test-roundtrip.js && node test-symmetry.js"
   }
 }
