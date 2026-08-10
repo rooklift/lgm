@@ -594,19 +594,18 @@ function updateSymUI() {
 
 function setSymmetry(mode, quiet) {
   if (mode === symMode) return;
-  const entering = !!mode && !symMode;
   symMode = mode;
-  if (entering) {
-    /* pick the axis parity that centres the existing content exactly */
+  if (mode) {
+    /* Every mode click re-derives the axis parity from the content and
+     * recentres, exactly as if entering from off — a manual odd/even
+     * override only lasts for the mode it was made in. */
     const b = contentBounds();
     symParity = b ? BoloSym.autoParity(b) : { x: 'odd', y: 'odd' };
-  }
-  /* a quarter-turn has a single centre: both axes must share a parity */
-  if (mode === 'rot90' && symParity.x !== symParity.y) {
-    symParity = { x: symParity.x, y: symParity.x };
-  }
-  updateSymUI();
-  if (entering) {
+    /* a quarter-turn has a single centre: both axes must share a parity */
+    if (mode === 'rot90' && symParity.x !== symParity.y) {
+      symParity = { x: symParity.x, y: symParity.x };
+    }
+    updateSymUI();
     const moved = centreContent();
     if (!quiet) {
       const note = symParity.x === symParity.y
@@ -614,8 +613,9 @@ function setSymmetry(mode, quiet) {
         : `mixed axis (${symParity.x} x, ${symParity.y} y)`;
       statusMsg(`symmetry on: ${BoloSym.MODES[mode].label}, ${note}${moved ? ' — map recentred' : ''}`);
     }
-  } else if (!quiet) {
-    statusMsg(mode ? `symmetry on: ${BoloSym.MODES[mode].label}` : 'symmetry off');
+  } else {
+    updateSymUI();
+    if (!quiet) statusMsg('symmetry off');
   }
   requestDraw();
 }

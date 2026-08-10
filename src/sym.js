@@ -78,8 +78,9 @@ function centreShift(b, parity) {
   };
 }
 
-/* Parity that centres this bounding box exactly: odd-sized content
- * wants an axis through a tile, even-sized content one between tiles. */
+/* Parity that centres this bounding box exactly, per axis: odd-sized
+ * content wants an axis through a tile, even-sized content one between
+ * tiles. */
 function autoParity(b) {
   return {
     x: (b.maxX - b.minX) % 2 === 0 ? 'odd' : 'even',

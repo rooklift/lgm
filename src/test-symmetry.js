@@ -51,13 +51,13 @@ for (const parity of [ODD, EVEN]) {
   }
 }
 
-/* Mixed parity is legal for everything except rot90. */
+/* Mixed parity is legal for everything except rot90 (which the editor
+ * never requests with mixed axes). */
 for (const mode of ['h', 'v', 'quad', 'rot180']) {
-  const t = BoloSym.transforms(mode, { x: 'even', y: 'odd' });
-  for (const tr of t) {
+  for (const tr of BoloSym.transforms(mode, { x: 'even', y: 'odd' })) {
     const [x1, y1] = tr.pos(60, 100);
     const [x2, y2] = tr.pos(x1, y1);
-    check(x2 === 60 && y2 === 100, `${mode} mixed parity: transform is not an involution/cycle at (60,100)`);
+    check(x2 === 60 && y2 === 100, `${mode} mixed parity: transform does not cycle back at (60,100)`);
   }
 }
 
@@ -104,6 +104,9 @@ check(r2.dir(0) === 8 && r2.dir(4) === 12, 'R2 dir: E->W, N->S');
   s = BoloSym.centreShift({ minX: 30, maxX: 41, minY: 200, maxY: 211 }, EVEN);
   check((30 + 41) / 2 + s.dx === 127.5 && (200 + 211) / 2 + s.dy === 127.5,
     'even box centres on the 127|128 boundary under an even axis');
+  s = BoloSym.centreShift({ minX: 30, maxX: 41, minY: 200, maxY: 210 }, { x: 'even', y: 'odd' });
+  check((30 + 41) / 2 + s.dx === 127.5 && (200 + 210) / 2 + s.dy === 128,
+    'mixed box centres exactly on each axis independently');
   s = BoloSym.centreShift({ minX: RGN_LO, maxX: RGN_HI - 1, minY: RGN_LO, maxY: RGN_HI - 1 }, ODD);
   check(s.dx === 0 && s.dy === 0, 'full-region box needs no shift');
   for (const parity of [ODD, EVEN]) {
