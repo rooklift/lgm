@@ -91,6 +91,7 @@ select, input[type="number"] {
 
 #props .row { margin-bottom: 4px; justify-content: space-between; }
 #props .hint { color: var(--dim); font-size: 12px; }
+#props .hint b { color: var(--text); font-weight: 600; }
 #props h3 { font-size: 12px; margin-bottom: 6px; }
 #props button {
   margin-top: 4px;

@@ -440,7 +440,10 @@ function renderProps() {
   if (!selected) {
     const hint = document.createElement('span');
     hint.className = 'hint';
-    hint.textContent = 'Right-click an object to select or drag it.';
+    const b = document.createElement('b');
+    b.textContent = 'Right-click';
+    hint.appendChild(b);
+    hint.appendChild(document.createTextNode(' an object to select or drag it.'));
     propsEl.appendChild(hint);
     return;
   }
