@@ -27,6 +27,24 @@
       </div>
 
       <div class="panel">
+        <h2>Symmetry</h2>
+        <div id="symmetry">
+          <button class="sym active" data-sym="off" title="No symmetry">Off</button>
+          <button class="sym" data-sym="h" title="Mirror left–right">⇋ H</button>
+          <button class="sym" data-sym="v" title="Mirror top–bottom">⇅ V</button>
+          <button class="sym" data-sym="quad" title="Mirror into all four quadrants">✛ Quad</button>
+          <button class="sym" data-sym="rot180" title="Rotate 180° about the centre">↻ 180°</button>
+          <button class="sym" data-sym="rot90" title="Rotate 90° about the centre (four copies)">↻ 90°</button>
+        </div>
+        <div id="symParity">
+          <button class="sympar" data-parity="odd" disabled
+            title="Axis through the middle of tile 128 — for odd-sized layouts">Odd axis</button>
+          <button class="sympar" data-parity="even" disabled
+            title="Axis between tiles 127 and 128 — for even-sized layouts">Even axis</button>
+        </div>
+      </div>
+
+      <div class="panel">
         <h2>Terrain</h2>
         <div id="palette"></div>
       </div>
@@ -45,6 +63,7 @@
           <span id="statusPos"></span>
           <span id="statusTerrain"></span>
           <span id="statusZoom"></span>
+          <span id="statusSym"></span>
           <span id="counts"></span>
           <span id="statusHint">wheel: zoom · middle-drag / space-drag: pan · right-click: select object</span>
         </div>
@@ -53,6 +72,7 @@
     </div>
   </div>
   <script src="format.js"></script>
+  <script src="sym.js"></script>
   <script src="renderer.js"></script>
 </body>
 </html>
