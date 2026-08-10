@@ -403,6 +403,28 @@ function objectAt(type, x, y) {
   return doc[OBJECT_LIST[type]].findIndex(o => o.x === x && o.y === y);
 }
 
+/* First object of any type on this tile, as {type, index}, else null. */
+function objectAtAnyType(x, y) {
+  for (const type of Object.keys(OBJECT_LIST)) {
+    const index = objectAt(type, x, y);
+    if (index >= 0) return { type, index };
+  }
+  return null;
+}
+
+function deleteSelected() {
+  if (!selected) return;
+  const list = doc[OBJECT_LIST[selected.type]];
+  if (!list[selected.index]) { selected = null; return; }
+  pushUndo();
+  list.splice(selected.index, 1);
+  selected = null;
+  setDirty(true);
+  updateCounts();
+  renderProps();
+  requestDraw();
+}
+
 /* Is any object (of any type) on this tile, other than the excluded one? */
 function tileOccupied(x, y, exclType, exclIndex) {
   for (const type of Object.keys(OBJECT_LIST)) {
@@ -418,7 +440,7 @@ function renderProps() {
   if (!selected) {
     const hint = document.createElement('span');
     hint.className = 'hint';
-    hint.textContent = 'Click an object with its tool selected.';
+    hint.textContent = 'Right-click an object to select or drag it.';
     propsEl.appendChild(hint);
     return;
   }
@@ -471,15 +493,7 @@ function renderProps() {
 
   const del = document.createElement('button');
   del.textContent = 'Delete';
-  del.addEventListener('click', () => {
-    pushUndo();
-    list.splice(selected.index, 1);
-    selected = null;
-    setDirty(true);
-    updateCounts();
-    renderProps();
-    requestDraw();
-  });
+  del.addEventListener('click', deleteSelected);
   propsEl.appendChild(del);
 }
 
@@ -559,24 +573,14 @@ canvas.addEventListener('pointerdown', e => {
     return;
   }
 
-  /* Right-click: delete the object under the cursor, whatever the tool.
-   * (Terrain erasing is the Deep sea swatch, not right-click.) */
+  /* Right-click: select the object under the cursor (whatever the tool)
+   * and allow dragging it; an empty tile clears the selection.
+   * Delete/Backspace removes the selected object. */
   if (e.button === 2) {
-    for (const type of Object.keys(OBJECT_LIST)) {
-      const idx = objectAt(type, t.x, t.y);
-      if (idx < 0) continue;
-      pushUndo();
-      doc[OBJECT_LIST[type]].splice(idx, 1);
-      if (selected && selected.type === type) {
-        if (selected.index === idx) selected = null;
-        else if (selected.index > idx) selected.index--;
-      }
-      setDirty(true);
-      updateCounts();
-      renderProps();
-      requestDraw();
-      break;
-    }
+    selected = objectAtAnyType(t.x, t.y);
+    if (selected) objDrag = { ...selected, undoPushed: false };
+    renderProps();
+    requestDraw();
     return;
   }
 
@@ -598,16 +602,13 @@ canvas.addEventListener('pointerdown', e => {
     requestDraw();
   } else if (tool === 'pill' || tool === 'base' || tool === 'start') {
     const listName = OBJECT_LIST[tool];
-    const idx = objectAt(tool, t.x, t.y);
     if (e.button === 0) {
-      if (idx >= 0) {
-        selected = { type: tool, index: idx };
-        objDrag = { type: tool, index: idx, undoPushed: false };
-      } else if (inRegion(t.x, t.y)) {
-        if (tileOccupied(t.x, t.y)) {
-          statusMsg('tile already occupied by another object');
-          return;
-        }
+      /* placement only: manipulating existing objects is right-click's job */
+      if (objectAtAnyType(t.x, t.y)) {
+        statusMsg('tile already occupied — right-click to select or drag');
+        return;
+      }
+      if (inRegion(t.x, t.y)) {
         if (tool === 'start' && doc.grid[t.y * MAP_SIZE + t.x] !== DEEP_SEA) {
           statusMsg('spawn points must be on deep sea');
           return;
@@ -728,6 +729,11 @@ window.addEventListener('keydown', e => {
     selected = null;
     renderProps();
     requestDraw();
+  }
+  if ((e.code === 'Delete' || e.code === 'Backspace') &&
+      selected && document.activeElement.tagName !== 'INPUT') {
+    deleteSelected();
+    e.preventDefault();
   }
 });
 window.addEventListener('keyup', e => {
