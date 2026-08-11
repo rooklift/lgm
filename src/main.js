@@ -102,7 +102,7 @@ function createWindow() {
   }
 
   /* Closing a dirty window defers to the renderer, which asks with the
-   * same confirm() used by New/Open, then requests a real close. */
+   * same discard prompt used by New/Open, then requests a real close. */
   win.on('close', e => {
     if (isDirty) {
       e.preventDefault();
@@ -160,6 +160,26 @@ ipcMain.handle('save-map', async (e, filePath, data) => {
     try { fs.unlinkSync(tmp); } catch { /* never created, or rename consumed it */ }
     return { canceled: true, error: String(err) };
   }
+});
+
+/* The renderer must not use window.confirm()/alert(): after Chromium's
+ * blocking dialogs, keyboard focus breaks and inputs stop accepting
+ * typing until the window is refocused (electron#19977 or #31917).
+ * Native dialogs from the main process don't have that problem. */
+ipcMain.handle('confirm-discard', async () => {
+  const res = await dialog.showMessageBox(win, {
+    type: 'warning',
+    buttons: ['Discard', 'Cancel'],
+    defaultId: 0,
+    cancelId: 1,
+    noLink: true,
+    message: 'Discard unsaved changes?',
+  });
+  return res.response === 0;
+});
+
+ipcMain.on('show-error', (e, title, message) => {
+  dialog.showErrorBox(title, message);
 });
 
 ipcMain.on('set-dirty', (e, d) => { isDirty = !!d; });

@@ -1368,8 +1368,16 @@ function loadDoc(map, path) {
   zoomFit();
 }
 
+/* Never window.confirm()/alert() here: Chromium's blocking dialogs break
+ * keyboard focus in Electron (inputs stop accepting typing until the
+ * window is refocused), so all prompts go through main's native dialogs. */
+async function confirmDiscard() {
+  if (!dirty) return true;
+  return api.confirmDiscard();
+}
+
 async function cmdNew() {
-  if (dirty && !confirm('Discard unsaved changes?')) return;
+  if (!await confirmDiscard()) return;
   loadDoc(BoloMap.newMap(), null);
 }
 
@@ -1377,15 +1385,15 @@ function loadFromBytes(data, path) {
   try {
     loadDoc(BoloMap.parseMap(data), path);
   } catch (err) {
-    alert(`Could not read map: ${err.message}`);
+    api.showError('Could not read map', err.message);
   }
 }
 
 async function cmdOpen() {
-  if (dirty && !confirm('Discard unsaved changes?')) return;
+  if (!await confirmDiscard()) return;
   const res = await api.openMap();
   if (res.canceled) {
-    if (res.error) alert(res.error);
+    if (res.error) api.showError('Could not open map', res.error);
     return;
   }
   loadFromBytes(res.data, res.path);
@@ -1394,9 +1402,9 @@ async function cmdOpen() {
 /* map passed on the command line (sent by main once the page loads) */
 api.onLoadMap(({ path, data }) => loadFromBytes(data, path));
 
-/* main defers a dirty-window close to us, for the same confirm() as New/Open */
-api.onConfirmClose(() => {
-  if (confirm('Discard unsaved changes?')) api.confirmClose();
+/* main defers a dirty-window close to us, for the same prompt as New/Open */
+api.onConfirmClose(async () => {
+  if (await confirmDiscard()) api.confirmClose();
 });
 
 /* drag & drop a .map anywhere onto the window */
@@ -1405,7 +1413,7 @@ window.addEventListener('drop', async e => {
   e.preventDefault();
   const file = e.dataTransfer.files[0];
   if (!file) return;
-  if (dirty && !confirm('Discard unsaved changes?')) return;
+  if (!await confirmDiscard()) return;
   const data = new Uint8Array(await file.arrayBuffer());
   let path = null;
   try { path = api.pathForFile(file) || null; } catch { /* keep null: Save will ask */ }
@@ -1418,7 +1426,7 @@ async function cmdSave(as) {
   const bytes = BoloMap.serializeMap(doc);
   const res = await api.saveMap(as ? null : filePath, bytes);
   if (res.canceled) {
-    if (res.error) alert(res.error);
+    if (res.error) api.showError('Could not save map', res.error);
     return;
   }
   /* A load that finished while the save was in flight replaced doc; the
