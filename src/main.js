@@ -44,13 +44,12 @@ function buildMenu() {
         { label: 'Fix spawn order', click: () => send('fix-start-order') },
         { label: 'Fix spawn directions', click: () => send('fix-start-dirs') },
         { type: 'separator' },
-        { label: 'Reset pillboxes (wait 50)', click: () => send('reset-pills') },
-        { label: 'Reset pillboxes (wait 100)', click: () => send('reset-pills-slow') },
-        { type: 'separator' },
         { label: 'Reset bases', click: () => send('reset-bases') },
+        { label: 'Reset pillboxes (wait 50)', click: () => send('reset-pills') },
         { type: 'separator' },
-        { label: 'Apply all fixes above', click: () => send('apply-all-fixes') },   // Well, except pillbox w/ speed 100
+        { label: 'Apply all fixes above', click: () => send('apply-all-fixes') },
         { type: 'separator' },
+        { label: 'Reset pillboxes (wait 100)', click: () => send('reset-pills-slow') },
         { label: 'Buffer the sea', click: () => send('buffer-sea') },
 
       ],

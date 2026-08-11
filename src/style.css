@@ -1,55 +1,55 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg: #10131a;
-  --panel: #1a1f2b;
-  --panel-edge: #2a3040;
-  --text: #cdd6e4;
-  --dim: #7d8798;
-  --accent: #4c8dff;
+	--bg: #10131a;
+	--panel: #1a1f2b;
+	--panel-edge: #2a3040;
+	--text: #cdd6e4;
+	--dim: #7d8798;
+	--accent: #4c8dff;
 }
 
 html, body { height: 100%; }
 body {
-  background: var(--bg);
-  color: var(--text);
-  font: 13px/1.4 "Segoe UI", system-ui, sans-serif;
-  overflow: hidden;
-  user-select: none;
+	background: var(--bg);
+	color: var(--text);
+	font: 13px/1.4 "Segoe UI", system-ui, sans-serif;
+	overflow: hidden;
+	user-select: none;
 }
 
 #layout { display: flex; height: 100vh; }
 
 #sidebar {
-  width: 258px;
-  flex: none;
-  overflow-y: auto;
-  background: var(--panel);
-  border-right: 1px solid var(--panel-edge);
-  padding: 10px;
+	width: 258px;
+	flex: none;
+	overflow-y: auto;
+	background: var(--panel);
+	border-right: 1px solid var(--panel-edge);
+	padding: 10px;
 }
 
 .panel { margin-bottom: 16px; }
 .panel h2 {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--dim);
-  margin-bottom: 6px;
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	color: var(--dim);
+	margin-bottom: 6px;
 }
 
 #tools { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
 #symmetry { display: flex; flex-wrap: wrap; gap: 4px; }
 #symParity { display: flex; gap: 4px; margin-top: 4px; }
 button.tool, button.sym, button.sympar {
-  flex: 1 1 40%;
-  padding: 6px 4px;
-  background: #232a3a;
-  color: var(--text);
-  border: 1px solid var(--panel-edge);
-  border-radius: 4px;
-  cursor: pointer;
-  font: inherit;
+	flex: 1 1 40%;
+	padding: 6px 4px;
+	background: #232a3a;
+	color: var(--text);
+	border: 1px solid var(--panel-edge);
+	border-radius: 4px;
+	cursor: pointer;
+	font: inherit;
 }
 button.sym { flex-basis: 30%; }
 button.tool:hover, button.sym:hover, button.sympar:hover { background: #2c3550; }
@@ -59,39 +59,39 @@ button.sympar:disabled:hover { background: #232a3a; }
 
 .row { display: flex; align-items: center; gap: 8px; }
 select, input[type="number"] {
-  background: #232a3a;
-  color: var(--text);
-  border: 1px solid var(--panel-edge);
-  border-radius: 3px;
-  padding: 3px 5px;
-  font: inherit;
-  width: 70px;
+	background: #232a3a;
+	color: var(--text);
+	border: 1px solid var(--panel-edge);
+	border-radius: 3px;
+	padding: 3px 5px;
+	font: inherit;
+	width: 70px;
 }
 
 #palette { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
 .swatch.blank { background: none; cursor: default; pointer-events: none; }
 .swatch {
-  height: 40px;
-  border: 2px solid transparent;
-  border-radius: 4px;
-  cursor: pointer;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  font-size: 9px;
-  color: rgba(255,255,255,0.9);
-  text-shadow: 0 1px 2px rgba(0,0,0,0.9);
-  padding-bottom: 2px;
-  text-align: center;
-  line-height: 1.1;
-  position: relative;
+	height: 40px;
+	border: 2px solid transparent;
+	border-radius: 4px;
+	cursor: pointer;
+	display: flex;
+	align-items: flex-end;
+	justify-content: center;
+	font-size: 9px;
+	color: rgba(255,255,255,0.9);
+	text-shadow: 0 1px 2px rgba(0,0,0,0.9);
+	padding-bottom: 2px;
+	text-align: center;
+	line-height: 1.1;
+	position: relative;
 }
 .swatch.active { border-color: #fff; box-shadow: 0 0 0 2px var(--accent); }
 .swatch .minedot {
-  position: absolute; top: 4px; left: 50%;
-  width: 8px; height: 8px; margin-left: -4px;
-  border-radius: 50%;
-  background: #ff3b30; border: 1px solid #7a0000;
+	position: absolute; top: 4px; left: 50%;
+	width: 8px; height: 8px; margin-left: -4px;
+	border-radius: 50%;
+	background: #ff3b30; border: 1px solid #7a0000;
 }
 
 #props .row { margin-bottom: 4px; justify-content: space-between; }
@@ -99,14 +99,14 @@ select, input[type="number"] {
 #props .hint b { color: var(--text); font-weight: 600; }
 #props h3 { font-size: 12px; margin-bottom: 6px; }
 #props button {
-  margin-top: 4px;
-  padding: 4px 8px;
-  background: #3a2330;
-  color: #ff9a94;
-  border: 1px solid #5a2a3a;
-  border-radius: 4px;
-  cursor: pointer;
-  font: inherit;
+	margin-top: 4px;
+	padding: 4px 8px;
+	background: #3a2330;
+	color: #ff9a94;
+	border: 1px solid #5a2a3a;
+	border-radius: 4px;
+	cursor: pointer;
+	font: inherit;
 }
 
 #main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
@@ -117,14 +117,14 @@ select, input[type="number"] {
 #view { flex: 1; display: block; cursor: crosshair; min-width: 0; min-height: 0; }
 
 #status {
-  flex: none;
-  overflow: hidden;
-  padding: 4px 10px;
-  background: var(--panel);
-  border-top: 1px solid var(--panel-edge);
-  color: var(--dim);
-  font-size: 12px;
-  white-space: nowrap;
+	flex: none;
+	overflow: hidden;
+	padding: 4px 10px;
+	background: var(--panel);
+	border-top: 1px solid var(--panel-edge);
+	color: var(--dim);
+	font-size: 12px;
+	white-space: nowrap;
 }
 #statusInfo { display: flex; gap: 18px; overflow: hidden; }
 #statusInfo span:first-child { min-width: 90px; }
