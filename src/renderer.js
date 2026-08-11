@@ -561,8 +561,8 @@ function contentBounds() {
  * so the content straddles the centre cell (128,128). Content inside the
  * saved region stays inside it (the centred box can't overhang, because
  * the region itself is centred on 128). One undoable step. */
-function centreContent() {
-  const b = contentBounds();
+function centreContent(boundsOverride) {
+  const b = boundsOverride || contentBounds();
   if (!b) return false;
   const { dx, dy } = BoloSym.centreShift(b, symParity);
   if (!dx && !dy) return false;
@@ -580,8 +580,13 @@ function centreContent() {
     }
   }
   doc.grid = ng;
+  /* clampRegion keeps coordinates valid if an object sits outside the
+   * shifted bounds (possible when detection bounds exclude spawns) */
   for (const listName of Object.values(OBJECT_LIST)) {
-    for (const o of doc[listName]) { o.x += dx; o.y += dy; }
+    for (const o of doc[listName]) {
+      o.x = clampRegion(o.x + dx);
+      o.y = clampRegion(o.y + dy);
+    }
   }
   rebuildOffscreen();
   setDirty(true);
@@ -688,6 +693,22 @@ function setSymmetry(mode, quiet) {
     updateSymUI();
     if (!quiet) statusMsg('symmetry off');
   }
+  requestDraw();
+}
+
+/* On load: if the map is already perfectly symmetric (spawns and the
+ * tiles under objects excused), switch the matching mode on. The map's
+ * own axes may sit anywhere; recentring moves them onto the board's
+ * standard axes — as one undoable step, only when a shift is needed,
+ * so an already-centred file loads clean. */
+function autoDetectSymmetry() {
+  const found = BoloSym.detect(doc);
+  if (!found) return;
+  symMode = found.mode;
+  symParity = found.parity;
+  updateSymUI();
+  const moved = centreContent(found.bounds);
+  statusMsg(`this map is ${BoloSym.MODES[found.mode].label} symmetric — symmetry mode on${moved ? ', map recentred' : ''}`, 4000);
   requestDraw();
 }
 
@@ -1260,6 +1281,7 @@ function loadDoc(map, path) {
   renderProps();
   updateCounts();
   setDirty(false);
+  autoDetectSymmetry(); /* may re-dirty the doc if it recentres */
   zoomFit();
 }
 

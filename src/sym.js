@@ -88,7 +88,94 @@ function autoParity(b) {
   };
 }
 
-const BoloSym = { MODES, transforms, orbit, centreShift, autoParity };
+/* Constants mirrored from format.js so node tests can load sym.js alone. */
+const SIZE = 256, DEEP_SEA = 0xff, LO = 21, HI = 236;
+
+/* Detect whether a map is already perfectly symmetric, and under which
+ * mode. Symmetry is judged about the content's own axes (the bounding
+ * box centre — any mirror or rotation must pass through it), so a
+ * symmetric map made elsewhere is recognised wherever it sits; the
+ * caller recentres it onto the board's standard axes afterwards.
+ *
+ * Slackness, by design: spawn points are ignored entirely; object
+ * properties are ignored (positions only); and terrain mismatches are
+ * excused when either cell sits under any object.
+ *
+ * Returns { mode, parity, bounds } or null. Preference order when
+ * several modes hold: quad, rot90, h, v, rot180. */
+function detect(map) {
+  let minX = SIZE, minY = SIZE, maxX = -1, maxY = -1;
+  const bump = (x, y) => {
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  };
+  for (let y = LO; y < HI; y++) {
+    for (let x = LO; x < HI; x++) {
+      if (map.grid[y * SIZE + x] !== DEEP_SEA) bump(x, y);
+    }
+  }
+  for (const o of map.pills) bump(o.x, o.y);
+  for (const o of map.bases) bump(o.x, o.y);
+  if (maxX < 0) return null;
+  const bounds = { minX, minY, maxX, maxY };
+
+  /* mirror sums: the x mirror is x -> S-x, so the axis sits at S/2 */
+  const S = minX + maxX, T = minY + maxY;
+
+  const inReg = (x, y) => x >= LO && x < HI && y >= LO && y < HI;
+  const occ = new Set();
+  for (const list of [map.pills, map.bases, map.starts]) {
+    for (const o of list) occ.add(o.y * SIZE + o.x);
+  }
+  const pillSet = new Set(map.pills.map(o => o.y * SIZE + o.x));
+  const baseSet = new Set(map.bases.map(o => o.y * SIZE + o.x));
+
+  const invariant = f => {
+    for (let y = LO; y < HI; y++) {
+      for (let x = LO; x < HI; x++) {
+        const [ix, iy] = f(x, y);
+        const a = map.grid[y * SIZE + x];
+        const b = inReg(ix, iy) ? map.grid[iy * SIZE + ix] : DEEP_SEA;
+        if (a === b) continue;
+        if (occ.has(y * SIZE + x)) continue;
+        if (inReg(ix, iy) && occ.has(iy * SIZE + ix)) continue;
+        return false;
+      }
+    }
+    return true;
+  };
+  const closed = (list, set, f) => list.every(o => {
+    const [ix, iy] = f(o.x, o.y);
+    return ix >= 0 && ix < SIZE && iy >= 0 && iy < SIZE && set.has(iy * SIZE + ix);
+  });
+  const holds = f => invariant(f) && closed(map.pills, pillSet, f) && closed(map.bases, baseSet, f);
+
+  const MX = (x, y) => [S - x, y];
+  const MY = (x, y) => [x, T - y];
+  const R2 = (x, y) => [S - x, T - y];
+  /* quarter turn about (S/2, T/2): needs a square box and an integer-
+   * valued map (S and T of equal parity) */
+  const square = (maxX - minX) === (maxY - minY) && (S + T) % 2 === 0;
+  const R1 = (x, y) => [(S + T) / 2 - y, (T - S) / 2 + x];
+
+  const parity = {
+    x: S % 2 === 0 ? 'odd' : 'even',
+    y: T % 2 === 0 ? 'odd' : 'even',
+  };
+  if (holds(MX)) {
+    /* mirror-x plus rot90 would imply mirror-y, so quad wins that race */
+    if (holds(MY)) return { mode: 'quad', parity, bounds };
+    return { mode: 'h', parity, bounds };
+  }
+  if (square && holds(R1)) return { mode: 'rot90', parity, bounds };
+  if (holds(MY)) return { mode: 'v', parity, bounds };
+  if (holds(R2)) return { mode: 'rot180', parity, bounds };
+  return null;
+}
+
+const BoloSym = { MODES, transforms, orbit, centreShift, autoParity, detect };
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = BoloSym;

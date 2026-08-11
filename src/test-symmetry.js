@@ -128,6 +128,58 @@ check(r2.dir(0) === 8 && r2.dir(4) === 12, 'R2 dir: E->W, N->S');
   check(p2.x === 'odd' && p2.y === 'odd', 'autoParity: single cell is odd/odd');
 }
 
+/* detect(): auto symmetry detection on load. Judged about the content's
+ * own axes; spawns invisible; object properties and under-object tiles
+ * excused. */
+{
+  const blank = () => ({ grid: new Uint8Array(256 * 256).fill(0xff), pills: [], bases: [], starts: [] });
+  const put = (m, x, y, t) => { m.grid[y * 256 + x] = t; };
+  const P = (x, y) => ({ x, y, owner: 255, armour: 15, speed: 50 });
+
+  let m = blank();
+  [[100, 100], [156, 100], [128, 90]].forEach(([x, y]) => put(m, x, y, 7));
+  let d = BoloSym.detect(m);
+  check(d && d.mode === 'h' && d.parity.x === 'odd', 'detect: mirror-x about tile 128');
+
+  m = blank();
+  for (const x of [100, 101, 154, 155]) for (const y of [60, 61, 194, 195]) put(m, x, y, 7);
+  d = BoloSym.detect(m);
+  check(d && d.mode === 'quad' && d.parity.x === 'even' && d.parity.y === 'even',
+    'detect: even-axis quad');
+
+  m = blank();
+  [[100, 100], [156, 156]].forEach(([x, y]) => put(m, x, y, 7));
+  d = BoloSym.detect(m);
+  check(d && d.mode === 'rot180', 'detect: half-turn only');
+
+  m = blank();
+  [[100, 110], [146, 100], [156, 146], [110, 156]].forEach(([x, y]) => put(m, x, y, 7));
+  d = BoloSym.detect(m);
+  check(d && d.mode === 'rot90', 'detect: quarter-turn orbit');
+
+  m = blank();
+  [[100, 100], [156, 100], [100, 156], [156, 156]].forEach(([x, y]) => put(m, x, y, 7));
+  m.starts.push({ x: 50, y: 50, dir: 3 });
+  d = BoloSym.detect(m);
+  check(d && d.mode === 'quad', 'detect: spawns are ignored');
+
+  m = blank();
+  m.pills.push(P(100, 100), { ...P(156, 100), armour: 3, owner: 1 });
+  put(m, 100, 100, 7);
+  put(m, 156, 100, 4); /* different tile under the mirror pill */
+  d = BoloSym.detect(m);
+  check(!!d, 'detect: under-object tiles and properties ignored');
+
+  m = blank();
+  [[100, 100], [150, 90], [105, 95]].forEach(([x, y]) => put(m, x, y, 7));
+  check(BoloSym.detect(m) === null, 'detect: asymmetric map yields null');
+
+  m = blank();
+  [[100, 100], [156, 100], [100, 156], [156, 156]].forEach(([x, y]) => put(m, x, y, 7));
+  m.pills.push(P(110, 110));
+  check(BoloSym.detect(m) === null, 'detect: lone unmirrored pill breaks every mode');
+}
+
 if (failures === 0) {
   console.log('symmetry tests: PASS');
 } else {
