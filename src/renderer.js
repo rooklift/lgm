@@ -145,13 +145,19 @@ function restore(snap) {
   setDirty(true);
   requestDraw();
 }
+/* Undo/redo/delete can fire mid-gesture (menu accelerators and the
+ * Delete key work while a button is held); ending the gesture first
+ * keeps a live drag or stroke from acting on stale indices into the
+ * restored/filtered lists. */
 function undo() {
   if (!undoStack.length) return;
+  endGesture();
   redoStack.push(snapshot());
   restore(undoStack.pop());
 }
 function redo() {
   if (!redoStack.length) return;
+  endGesture();
   undoStack.push(snapshot());
   restore(redoStack.pop());
 }
@@ -513,6 +519,7 @@ function objectAtAnyType(x, y) {
 
 function deleteSelected() {
   if (!selected) return;
+  endGesture(); /* a live drag would hold a stale index after the filter */
   const { type } = selected;
   const listName = OBJECT_LIST[type];
   const list = doc[listName];
