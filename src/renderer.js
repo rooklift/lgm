@@ -110,21 +110,34 @@ function snapshot() {
     bases: doc.bases.map(o => ({ ...o })),
     starts: doc.starts.map(o => ({ ...o })),
     selected: selected ? { ...selected } : null,
+    symMode,
+    symParity: { ...symParity },
   };
 }
-function pushUndo() {
-  undoStack.push(snapshot());
+/* For edits whose snapshot must predate other state changes (mode or
+ * parity switches that recentre): take the snapshot first, mutate,
+ * then push it only if something actually changed. */
+function pushUndoEntry(snap) {
+  undoStack.push(snap);
   if (undoStack.length > UNDO_MAX) undoStack.shift();
   redoStack.length = 0;
 }
+function pushUndo() {
+  pushUndoEntry(snapshot());
+}
 /* The restored selection is valid by construction: it was captured in
- * the same snapshot as the lists it indexes into. */
+ * the same snapshot as the lists it indexes into. Symmetry mode and
+ * parity travel with the snapshot, so undoing a recentring shift also
+ * unwinds the mode change that caused it. */
 function restore(snap) {
   doc.grid = snap.grid;
   doc.pills = snap.pills;
   doc.bases = snap.bases;
   doc.starts = snap.starts;
   selected = snap.selected ? { ...snap.selected } : null;
+  symMode = snap.symMode;
+  symParity = { ...snap.symParity };
+  updateSymUI();
   rebuildOffscreen();
   renderProps();
   refreshHoverStatus();
@@ -540,13 +553,13 @@ function symOrbit(x, y) {
  * never looks at spawns, and they must not get a vote on the axes
  * either. Content inside the saved region stays inside it (the centred
  * box can't overhang, because the region itself is centred on 128).
- * One undoable step. */
+ * The caller owns the undo entry — its snapshot must be taken before
+ * the mode/parity change that led here. */
 function centreContent(boundsOverride) {
   const b = boundsOverride || BoloSym.contentBox(doc);
   if (!b) return false;
   const { dx, dy } = BoloSym.centreShift(b, symParity);
   if (!dx && !dy) return false;
-  pushUndo();
   const ng = new Uint8Array(MAP_SIZE * MAP_SIZE);
   ng.fill(DEEP_SEA);
   for (let y = 0; y < MAP_SIZE; y++) {
@@ -650,6 +663,7 @@ function dragObjectTo(tx, ty) {
 
 function setSymmetry(mode, quiet) {
   if (mode === symMode) return;
+  const snap = snapshot(); /* pre-change, in case entering recentres */
   symMode = mode;
   if (mode) {
     /* Every mode click re-derives the axis parity from the content and
@@ -664,6 +678,7 @@ function setSymmetry(mode, quiet) {
     }
     updateSymUI();
     const moved = centreContent();
+    if (moved) pushUndoEntry(snap);
     if (!quiet) {
       const note = symParity.x === symParity.y
         ? `${symParity.x} axis`
@@ -685,10 +700,12 @@ function setSymmetry(mode, quiet) {
 function autoDetectSymmetry() {
   const found = BoloSym.detect(doc);
   if (!found) return;
+  const snap = snapshot(); /* pre-change: symmetry still off here */
   symMode = found.mode;
   symParity = found.parity;
   updateSymUI();
   const moved = centreContent(found.bounds);
+  if (moved) pushUndoEntry(snap);
   const except = found.spawnsSymmetric ? '' : ' (except spawns)';
   statusMsg(`this map is ${BoloSym.MODES[found.mode].label} symmetric${except} — symmetry mode on${moved ? ', map recentred' : ''}`, 4000);
   requestDraw();
@@ -716,9 +733,11 @@ function cmdSymmetryScore() {
 function setParity(p) {
   if (!symMode) return;
   if (symParity.x === p && symParity.y === p) return;
+  const snap = snapshot(); /* pre-change, in case the new axis recentres */
   symParity = { x: p, y: p };
   updateSymUI();
   const moved = centreContent();
+  if (moved) pushUndoEntry(snap);
   statusMsg(`symmetry axis: ${p === 'odd' ? 'through tile 128' : 'between tiles 127 and 128'}${moved ? ' — map recentred' : ''}`);
   requestDraw();
 }
@@ -1261,9 +1280,7 @@ function cmdApplyAllFixes() {
     statusMsg('no fixes needed');
     return;
   }
-  undoStack.push(snap);
-  if (undoStack.length > UNDO_MAX) undoStack.shift();
-  redoStack.length = 0;
+  pushUndoEntry(snap);
   setDirty(true);
   renderProps();
   requestDraw();
