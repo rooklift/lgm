@@ -1405,31 +1405,53 @@ async function confirmDiscard() {
   return api.confirmDiscard();
 }
 
+/* Document replacements can overlap — a native Open dialog can still be
+ * up when a drop or a New goes through. Each takes a ticket in request
+ * order, and replacing the document claims it; a replacement holding an
+ * older ticket than the one already claimed drops its result rather than
+ * clobbering the newer document, so the later-requested load prevails
+ * however the file reads race. A cancelled request (or bytes that don't
+ * parse) never claims, so it doesn't strand an earlier load either. */
+let loadTicket = 0, loadClaimed = 0;
+function takeLoadTicket() { return ++loadTicket; }
+function claimLoad(ticket) {
+  if (ticket <= loadClaimed) return false;
+  loadClaimed = ticket;
+  return true;
+}
+
 async function cmdNew() {
+  const ticket = takeLoadTicket();
   if (!await confirmDiscard()) return;
+  if (!claimLoad(ticket)) return;
   loadDoc(BoloMap.newMap(), null);
 }
 
-function loadFromBytes(data, path) {
+function loadFromBytes(data, path, ticket) {
+  let map;
   try {
-    loadDoc(BoloMap.parseMap(data), path);
+    map = BoloMap.parseMap(data); /* parse before claiming: a bad file loses nothing */
   } catch (err) {
     api.showError('Could not read map', err.message);
+    return;
   }
+  if (!claimLoad(ticket)) return;
+  loadDoc(map, path);
 }
 
 async function cmdOpen() {
+  const ticket = takeLoadTicket();
   if (!await confirmDiscard()) return;
   const res = await api.openMap();
   if (res.canceled) {
     if (res.error) api.showError('Could not open map', res.error);
     return;
   }
-  loadFromBytes(res.data, res.path);
+  loadFromBytes(res.data, res.path, ticket);
 }
 
 /* map passed on the command line (sent by main once the page loads) */
-api.onLoadMap(({ path, data }) => loadFromBytes(data, path));
+api.onLoadMap(({ path, data }) => loadFromBytes(data, path, takeLoadTicket()));
 
 /* main defers a dirty-window close to us, for the same prompt as New/Open */
 api.onConfirmClose(async () => {
@@ -1442,11 +1464,12 @@ window.addEventListener('drop', async e => {
   e.preventDefault();
   const file = e.dataTransfer.files[0];
   if (!file) return;
+  const ticket = takeLoadTicket();
   if (!await confirmDiscard()) return;
   const data = new Uint8Array(await file.arrayBuffer());
   let path = null;
   try { path = api.pathForFile(file) || null; } catch { /* keep null: Save will ask */ }
-  loadFromBytes(data, path);
+  loadFromBytes(data, path, ticket);
 });
 
 async function cmdSave(as) {
