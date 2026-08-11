@@ -1382,6 +1382,7 @@ window.addEventListener('drop', async e => {
 });
 
 async function cmdSave(as) {
+  const savedDoc = doc;
   const savedGen = editGen;
   const bytes = BoloMap.serializeMap(doc);
   const res = await api.saveMap(as ? null : filePath, bytes);
@@ -1389,6 +1390,9 @@ async function cmdSave(as) {
     if (res.error) alert(res.error);
     return;
   }
+  /* A load that finished while the save was in flight replaced doc; the
+   * path and clean state belong to the old document, not this one. */
+  if (doc !== savedDoc) return;
   filePath = res.path;
   /* An edit made while the save was in flight isn't in the bytes just
    * written, so the document must stay dirty relative to the file. */
