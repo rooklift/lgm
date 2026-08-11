@@ -56,6 +56,7 @@ let terrain = 7; /* grass */
 let brushSize = 1;
 let selected = null; /* {type, index} */
 let showPillRange = false;
+let basesAsCircles = false;
 let symMode = null; /* null | 'h' | 'v' | 'quad' | 'rot180' | 'rot90' */
 let symParity = { x: 'odd', y: 'odd' }; /* 'odd': axis through tile 128; 'even': between 127 and 128 */
 
@@ -369,8 +370,15 @@ function drawObject(type, index, o, r, font) {
 	} else if (type === 'base') {
 		ctx.fillStyle = '#f0b429';
 		ctx.strokeStyle = '#7a5200';
-		ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
-		ctx.strokeRect(cx - r, cy - r, r * 2, r * 2);
+		if (basesAsCircles) {
+			ctx.beginPath();
+			ctx.arc(cx, cy, r, 0, Math.PI * 2);
+			ctx.fill();
+			ctx.stroke();
+		} else {
+			ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+			ctx.strokeRect(cx - r, cy - r, r * 2, r * 2);
+		}
 	} else {
 		ctx.fillStyle = '#fff';
 		ctx.strokeStyle = '#333';
@@ -1568,6 +1576,7 @@ api.onMenu(cmd => {
 		case 'find-flaw': cmdFindFlaw(); break;
 		case 'apply-all-fixes': cmdApplyAllFixes(); break;
 		case 'toggle-pill-range': showPillRange = !showPillRange; requestDraw(); break;
+		case 'toggle-base-circles': basesAsCircles = !basesAsCircles; requestDraw(); break;
 		case 'zoom-in': zoomStep(1); break;
 		case 'zoom-out': zoomStep(-1); break;
 		case 'zoom-fit': zoomFit(); break;

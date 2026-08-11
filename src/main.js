@@ -69,6 +69,7 @@ function buildMenu() {
         { label: 'Fit map', accelerator: 'CmdOrCtrl+0', click: () => send('zoom-fit') },
         { type: 'separator' },
         { label: 'Show pillbox range', type: 'checkbox', checked: false, click: () => send('toggle-pill-range') },
+        { label: 'Draw bases as circles', type: 'checkbox', checked: false, click: () => send('toggle-base-circles') },
         { type: 'separator' },
         { label: "Toggle dev tools", role: 'toggleDevTools' },
       ],
