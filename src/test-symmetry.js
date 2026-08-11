@@ -236,6 +236,22 @@ check(r2.dir(0) === 8 && r2.dir(4) === 12, 'R2 dir: E->W, N->S');
   [[100, 100], [156, 156]].forEach(([x, y]) => put(m, x, y, 7));
   s = BoloSym.score(m);
   check(s.perMode.rot180 === 0 && s.perMode.h > 0, 'score: perMode distinguishes modes');
+
+  /* spawnsSymmetric: a separate yes/no, never part of the score */
+  m = blank();
+  QUAD4.forEach(([x, y]) => put(m, x, y, 7));
+  m.starts.push({ x: 90, y: 90, dir: 0 }); /* lone, asymmetric */
+  s = BoloSym.score(m);
+  check(s.flaws === 0 && s.spawnsSymmetric === false, 'score: lone spawn flags spawnsSymmetric');
+  let d = BoloSym.detect(m);
+  check(d && d.mode === 'quad' && d.spawnsSymmetric === false, 'detect: lone spawn flags spawnsSymmetric');
+  for (const [x, y] of [[90, 166], [166, 90], [166, 166]]) m.starts.push({ x, y, dir: 0 });
+  s = BoloSym.score(m);
+  d = BoloSym.detect(m);
+  check(s.spawnsSymmetric === true && d.spawnsSymmetric === true,
+    'completed spawn orbit is spawn-symmetric');
+  check(BoloSym.spawnsSymmetric(blank(), 'quad', 256, 256) === true,
+    'spawnsSymmetric: no spawns counts as symmetric');
 }
 
 if (failures === 0) {

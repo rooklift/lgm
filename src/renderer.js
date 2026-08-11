@@ -689,7 +689,8 @@ function autoDetectSymmetry() {
   symParity = found.parity;
   updateSymUI();
   const moved = centreContent(found.bounds);
-  statusMsg(`this map is ${BoloSym.MODES[found.mode].label} symmetric — symmetry mode on${moved ? ', map recentred' : ''}`, 4000);
+  const except = found.spawnsSymmetric ? '' : ' (except spawns)';
+  statusMsg(`this map is ${BoloSym.MODES[found.mode].label} symmetric${except} — symmetry mode on${moved ? ', map recentred' : ''}`, 4000);
   requestDraw();
 }
 
@@ -703,7 +704,8 @@ function cmdSymmetryScore() {
   }
   const label = m => BoloSym.MODES[m].label;
   if (s.flaws === 0) {
-    statusMsg(`symmetry flaws: 0 — perfectly ${label(s.mode)} symmetric`, 5000);
+    const except = s.spawnsSymmetric ? '' : ' (except spawns)';
+    statusMsg(`symmetry flaws: 0 — perfectly ${label(s.mode)} symmetric${except}`, 5000);
     return;
   }
   const parts = Object.keys(BoloSym.MODES).map(m => `${label(m)} ${s.perMode[m]}`).join(' · ');

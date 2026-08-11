@@ -171,15 +171,49 @@ function detect(map) {
     x: S % 2 === 0 ? 'odd' : 'even',
     y: T % 2 === 0 ? 'odd' : 'even',
   };
+  const found = mode =>
+    ({ mode, parity, bounds, spawnsSymmetric: spawnsSymmetric(map, mode, S, T) });
   if (holds(MX)) {
     /* mirror-x plus rot90 would imply mirror-y, so quad wins that race */
-    if (holds(MY)) return { mode: 'quad', parity, bounds };
-    return { mode: 'h', parity, bounds };
+    if (holds(MY)) return found('quad');
+    return found('h');
   }
-  if (square && holds(R1)) return { mode: 'rot90', parity, bounds };
-  if (holds(MY)) return { mode: 'v', parity, bounds };
-  if (holds(R2)) return { mode: 'rot180', parity, bounds };
+  if (square && holds(R1)) return found('rot90');
+  if (holds(MY)) return found('v');
+  if (holds(R2)) return found('rot180');
   return null;
+}
+
+/* Position-only transform group about mirror sums S and T (the x axis
+ * sits at S/2, the y axis at T/2). rot90 requires S and T of equal
+ * parity; callers ensure that. */
+function groupAbout(mode, S, T) {
+  const ID = (x, y) => [x, y];
+  const MX = (x, y) => [S - x, y];
+  const MY = (x, y) => [x, T - y];
+  const R2 = (x, y) => [S - x, T - y];
+  const R1 = (x, y) => [(S + T) / 2 - y, (T - S) / 2 + x];
+  const R3 = (x, y) => [(S - T) / 2 + y, (S + T) / 2 - x];
+  switch (mode) {
+    case 'h':      return [ID, MX];
+    case 'v':      return [ID, MY];
+    case 'quad':   return [ID, MX, MY, R2];
+    case 'rot180': return [ID, R2];
+    default:       return [ID, R1, R2, R3]; /* rot90 */
+  }
+}
+
+/* Are the spawn points symmetric — as positions, one on every image
+ * tile — under the given mode about axes S,T? Spawns are excluded from
+ * every other symmetry judgement; this answers that one follow-up
+ * question separately. No spawns counts as symmetric. */
+function spawnsSymmetric(map, mode, S, T) {
+  const keys = new Set(map.starts.map(o => o.x + ',' + o.y));
+  const tf = groupAbout(mode, S, T);
+  return map.starts.every(o => tf.every(f => {
+    const [ix, iy] = f(o.x, o.y);
+    return keys.has(ix + ',' + iy);
+  }));
 }
 
 /* Score a map's symmetry: the minimum number of edits (tile changes,
@@ -210,22 +244,6 @@ function score(map) {
   const pillKeys = new Set(map.pills.map(o => o.x + ',' + o.y));
   const baseKeys = new Set(map.bases.map(o => o.x + ',' + o.y));
 
-  const groupOf = (mode, S, T) => {
-    const ID = (x, y) => [x, y];
-    const MX = (x, y) => [S - x, y];
-    const MY = (x, y) => [x, T - y];
-    const R2 = (x, y) => [S - x, T - y];
-    const R1 = (x, y) => [(S + T) / 2 - y, (T - S) / 2 + x];
-    const R3 = (x, y) => [(S - T) / 2 + y, (S + T) / 2 - x];
-    switch (mode) {
-      case 'h':      return [ID, MX];
-      case 'v':      return [ID, MY];
-      case 'quad':   return [ID, MX, MY, R2];
-      case 'rot180': return [ID, R2];
-      default:       return [ID, R1, R2, R3]; /* rot90 */
-    }
-  };
-
   const objectCost = (list, keys, tf) => {
     let cost = 0;
     const done = new Set();
@@ -244,7 +262,7 @@ function score(map) {
   };
 
   const evalCombo = (mode, S, T) => {
-    const tf = groupOf(mode, S, T);
+    const tf = groupAbout(mode, S, T);
     let flaws = 0;
     const seen = new Uint8Array(SIZE * SIZE);
     const ox = [], oy = [], vals = [];
@@ -309,10 +327,12 @@ function score(map) {
       y: best.T % 2 === 0 ? 'odd' : 'even',
     },
     perMode,
+    spawnsSymmetric: spawnsSymmetric(map, best.mode, best.S, best.T),
   };
 }
 
-const BoloSym = { MODES, transforms, orbit, centreShift, autoParity, contentBox, detect, score };
+const BoloSym = { MODES, transforms, orbit, centreShift, autoParity, contentBox,
+                  spawnsSymmetric, detect, score };
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = BoloSym;
