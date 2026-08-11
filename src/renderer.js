@@ -1373,6 +1373,13 @@ function cmdApplyAllFixes() {
 
 /* ---------- file operations ---------- */
 function loadDoc(map, path) {
+  /* Like undo/redo: a load can land mid-gesture (menu accelerators fire
+   * while a button is held, and a drop resolves whenever it resolves), so
+   * end the gesture first — otherwise a live stroke or drag carries on
+   * into the fresh document, painting it or moving objects the user never
+   * grabbed, through indices that now mean something else. Before the
+   * swap, so the gesture unwinds against the document it belonged to. */
+  endGesture();
   doc = map;
   filePath = path;
   selected = null;
