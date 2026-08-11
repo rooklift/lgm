@@ -909,6 +909,10 @@ document.getElementById('brushSize').addEventListener('change', e => {
 let painting = false;
 let paintTerrain = 7;
 let lastTile = null;
+/* Pre-stroke snapshot, pushed onto the undo stack only once the stroke
+ * actually changes a cell (mirrors included), so no-op clicks leave the
+ * undo and redo stacks alone. */
+let paintSnap = null;
 let panning = false;
 let panStart = null;
 let spaceDown = false;
@@ -957,19 +961,22 @@ canvas.addEventListener('pointerdown', e => {
   }
 
   if (tool === 'paint' && e.button === 0) {
-    pushUndo();
     painting = true;
     paintTerrain = terrain;
     lastTile = t;
-    if (paintBrush(t.x, t.y, paintTerrain)) setDirty(true);
+    paintSnap = snapshot();
+    if (paintBrush(t.x, t.y, paintTerrain)) {
+      pushUndoEntry(paintSnap);
+      paintSnap = null;
+      setDirty(true);
+    }
     requestDraw();
   } else if (tool === 'fill' && e.button === 0) {
-    pushUndo();
+    const snap = snapshot();
     if (floodFill(t.x, t.y, terrain)) {
+      pushUndoEntry(snap);
       setDirty(true);
       if (selected) renderProps();
-    } else {
-      undoStack.pop();
     }
     requestDraw();
   } else if (tool === 'pill' || tool === 'base' || tool === 'start') {
@@ -1042,7 +1049,13 @@ canvas.addEventListener('pointermove', e => {
     requestDraw();
   } else if (painting && lastTile) {
     if (t.x !== lastTile.x || t.y !== lastTile.y) {
-      if (paintLine(lastTile.x, lastTile.y, t.x, t.y, paintTerrain)) setDirty(true);
+      if (paintLine(lastTile.x, lastTile.y, t.x, t.y, paintTerrain)) {
+        if (paintSnap) {
+          pushUndoEntry(paintSnap);
+          paintSnap = null;
+        }
+        setDirty(true);
+      }
       lastTile = t;
       requestDraw();
     }
@@ -1060,6 +1073,7 @@ function endGesture() {
   if (painting && selected) renderProps(); /* refresh "terrain under" readout */
   painting = false;
   lastTile = null;
+  paintSnap = null;
   panning = false;
   panStart = null;
   objDrag = null;
