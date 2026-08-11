@@ -808,11 +808,11 @@ function renderProps() {
     propsEl.appendChild(row);
   }
 
-  /* Dormant: pill/base stat editors. Stats are forced to defaults at save
-   * time (see cmdSave), so editing them here would be misleading — only
-   * the spawn's dir stays editable. To revive, iterate
-   * OBJECT_FIELDS[selected.type] unconditionally and drop the
-   * normalization in cmdSave. */
+  /* Dormant: pill/base stat editors. We deliberately don't expose these
+   * knobs — non-default values loaded from disk survive saves untouched,
+   * and the reset fixes in the menu normalize them on request. Only the
+   * spawn's dir stays editable. To revive, iterate
+   * OBJECT_FIELDS[selected.type] unconditionally. */
   const fields = selected.type === 'start' ? OBJECT_FIELDS[selected.type] : [];
   for (const [field, min, max] of fields) {
     const row = document.createElement('label');
@@ -1231,10 +1231,7 @@ function cmdFixSpawnDirs(quiet) {
   return true;
 }
 
-/* Reset all objects of a type to neutral ownership and default stats.
- * Dormant: unreferenced while cmdSave forces defaults on every save
- * (the menu entries and apply-all-fixes calls are commented out). */
-// eslint-disable-next-line no-unused-vars
+/* Reset all objects of a type to neutral ownership and default stats. */
 function cmdResetObjects(type, label, quiet) {
   const list = doc[OBJECT_LIST[type]];
   const defaults = OBJECT_DEFAULTS[type];
@@ -1304,10 +1301,8 @@ function cmdApplyAllFixes() {
     cmdFixOrder('bases', 'bases', STATUS_SLOTS, true),
     cmdFixOrder('starts', 'spawns', SPAWN_SLOTS, true),
     cmdFixSpawnDirs(true),
-    /* dormant — cmdSave now forces pill/base defaults on every save:
     cmdResetObjects('pill', 'pillboxes', true),
     cmdResetObjects('base', 'bases', true),
-    */
   ].filter(Boolean).length;
   if (!changed) {
     statusMsg('no fixes needed');
@@ -1381,15 +1376,7 @@ window.addEventListener('drop', async e => {
 });
 
 async function cmdSave(as) {
-  /* Pill/base stats are not editable in the GUI (their editors and the
-   * reset-fixes are dormant), so force defaults into the file here.
-   * The in-memory doc is left untouched. We accept that this overwrites
-   * non-normal objects in loaded maps. */
-  const bytes = BoloMap.serializeMap({
-    ...doc,
-    pills: doc.pills.map(o => ({ ...o, ...OBJECT_DEFAULTS.pill })),
-    bases: doc.bases.map(o => ({ ...o, ...OBJECT_DEFAULTS.base })),
-  });
+  const bytes = BoloMap.serializeMap(doc);
   const res = await api.saveMap(as ? null : filePath, bytes);
   if (res.canceled) {
     if (res.error) alert(res.error);
@@ -1411,10 +1398,8 @@ api.onMenu(cmd => {
     case 'fix-pill-order': cmdFixOrder('pills', 'pillboxes', STATUS_SLOTS); break;
     case 'fix-start-order': cmdFixOrder('starts', 'spawns', SPAWN_SLOTS); break;
     case 'fix-start-dirs': cmdFixSpawnDirs(); break;
-    /* dormant — menu entries commented out in main.js:
     case 'reset-pills': cmdResetObjects('pill', 'pillboxes'); break;
     case 'reset-bases': cmdResetObjects('base', 'bases'); break;
-    */
     case 'buffer-sea': cmdBufferSea(); break;
     case 'apply-all-fixes': cmdApplyAllFixes(); break;
     case 'toggle-pill-range': showPillRange = !showPillRange; requestDraw(); break;
