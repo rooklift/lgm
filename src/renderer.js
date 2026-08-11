@@ -1505,6 +1505,7 @@ async function cmdSave(as) {
   /* An edit made while the save was in flight isn't in the bytes just
    * written, so the document must stay dirty relative to the file. */
   if (editGen === savedGen) setDirty(false);
+  else updateTitle(); /* Save As renamed the doc even though it stays dirty */
 }
 
 api.onMenu(cmd => {
