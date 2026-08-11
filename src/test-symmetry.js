@@ -254,6 +254,50 @@ check(r2.dir(0) === 8 && r2.dir(4) === 12, 'R2 dir: E->W, N->S');
     'spawnsSymmetric: no spawns counts as symmetric');
 }
 
+/* findFlaw(): pins one concrete tile the best mode would edit. */
+{
+  const blank = () => ({ grid: new Uint8Array(256 * 256).fill(0xff), pills: [], bases: [], starts: [] });
+  const put = (m, x, y, t) => { m.grid[y * 256 + x] = t; };
+  const P = (x, y) => ({ x, y, owner: 255, armour: 15, speed: 50 });
+  const QUAD4 = [[100, 100], [156, 100], [100, 156], [156, 156]];
+
+  check(BoloSym.findFlaw(blank()) === null, 'findFlaw: empty map is null');
+
+  let m = blank();
+  QUAD4.forEach(([x, y]) => put(m, x, y, 7));
+  let f = BoloSym.findFlaw(m);
+  check(f && f.flaws === 0 && f.flaw === null, 'findFlaw: perfect quad has no flaw');
+
+  m = blank();
+  QUAD4.slice(0, 3).forEach(([x, y]) => put(m, x, y, 7)); /* (156,156) missing */
+  f = BoloSym.findFlaw(m);
+  check(f && f.flaw && f.flaw.kind === 'terrain' && f.flaw.x === 156 && f.flaw.y === 156,
+    'findFlaw: names the empty corner of a quad');
+
+  m = blank();
+  QUAD4.forEach(([x, y]) => put(m, x, y, 7));
+  m.pills.push(P(110, 110)); /* lone: cheaper to remove */
+  f = BoloSym.findFlaw(m);
+  check(f && f.flaw && f.flaw.kind === 'pill' && !f.flaw.missing
+    && f.flaw.x === 110 && f.flaw.y === 110,
+    'findFlaw: lone pill reported as the stray');
+
+  m = blank();
+  QUAD4.forEach(([x, y]) => put(m, x, y, 7));
+  m.pills.push(P(110, 110), P(146, 110), P(110, 146)); /* 3 of a 4-orbit */
+  f = BoloSym.findFlaw(m);
+  check(f && f.flaw && f.flaw.kind === 'pill' && f.flaw.missing
+    && f.flaw.x === 146 && f.flaw.y === 146,
+    'findFlaw: mostly-present pill orbit names the gap');
+
+  /* flaw location agrees with the score: fixing it lowers the count */
+  m = blank();
+  QUAD4.slice(0, 3).forEach(([x, y]) => put(m, x, y, 7));
+  f = BoloSym.findFlaw(m);
+  put(m, f.flaw.x, f.flaw.y, 7);
+  check(BoloSym.score(m).flaws === 0, 'findFlaw: repairing the named tile perfects the map');
+}
+
 if (failures === 0) {
   console.log('symmetry tests: PASS');
 } else {

@@ -228,7 +228,8 @@ function spawnsSymmetric(map, mode, S, T) {
  * and bases per position-orbit (the cheaper of adding the missing or
  * removing the strays).
  *
- * Returns { flaws, mode, parity, perMode } or null for an empty map. */
+ * Returns { flaws, mode, parity, S, T, perMode } or null for an empty
+ * map (S and T are the winning mirror sums, for findFlaw). */
 function score(map) {
   const b = contentBox(map);
   if (!b) return null;
@@ -326,13 +327,91 @@ function score(map) {
       x: best.S % 2 === 0 ? 'odd' : 'even',
       y: best.T % 2 === 0 ? 'odd' : 'even',
     },
+    S: best.S,
+    T: best.T,
     perMode,
     spawnsSymmetric: spawnsSymmetric(map, best.mode, best.S, best.T),
   };
 }
 
+/* Locate one concrete flaw: a tile that score()'s winning mode would
+ * edit. Terrain first — an in-region cell, not under an object, that
+ * disagrees with its orbit's most common value (or, when the minority
+ * is an immutable off-region image, any in-region member of the broken
+ * orbit). Then pills and bases: a stray object whose orbit is mostly
+ * empty (missing: false), or the empty tile of a mostly-present orbit
+ * (missing: true) — matching whichever fix objectCost priced.
+ * Returns score()'s result plus a flaw field { x, y, kind, missing }
+ * with kind 'terrain'|'pill'|'base' (flaw is null when the map is
+ * perfect), or null for an empty map. */
+function findFlaw(map) {
+  const s = score(map);
+  if (!s || s.flaws === 0) return s && { ...s, flaw: null };
+  const tf = groupAbout(s.mode, s.S, s.T);
+
+  const inReg = (x, y) => x >= LO && x < HI && y >= LO && y < HI;
+  const occ = new Set();
+  for (const list of [map.pills, map.bases, map.starts]) {
+    for (const o of list) occ.add(o.y * SIZE + o.x);
+  }
+
+  const seen = new Uint8Array(SIZE * SIZE);
+  for (let y = LO; y < HI; y++) {
+    for (let x = LO; x < HI; x++) {
+      if (seen[y * SIZE + x]) continue;
+      const mem = [];
+      for (const f of tf) {
+        const [ix, iy] = f(x, y);
+        if (!mem.some(m => m.x === ix && m.y === iy)) mem.push({ x: ix, y: iy });
+      }
+      for (const m of mem) {
+        m.off = !inReg(m.x, m.y);
+        if (!m.off) seen[m.y * SIZE + m.x] = 1;
+        m.wild = !m.off && occ.has(m.y * SIZE + m.x);
+        m.v = m.off ? DEEP_SEA : map.grid[m.y * SIZE + m.x];
+      }
+      const vals = mem.filter(m => !m.wild).map(m => m.v);
+      if (vals.length < 2) continue;
+      let modal = vals[0], maxc = 0;
+      for (const v of vals) {
+        const c = vals.filter(w => w === v).length;
+        if (c > maxc) { maxc = c; modal = v; }
+      }
+      if (maxc === vals.length) continue;
+      const bad = mem.find(m => !m.off && !m.wild && m.v !== modal)
+               || mem.find(m => !m.off && !m.wild);
+      if (bad) return { ...s, flaw: { x: bad.x, y: bad.y, kind: 'terrain', missing: false } };
+    }
+  }
+
+  const objFlaw = (list, kind) => {
+    const keys = new Set(list.map(o => o.x + ',' + o.y));
+    const done = new Set();
+    for (const o of list) {
+      if (done.has(o.x + ',' + o.y)) continue;
+      const slots = [];
+      for (const f of tf) {
+        const [ix, iy] = f(o.x, o.y);
+        const k = ix + ',' + iy;
+        if (!slots.some(sl => sl.k === k)) slots.push({ x: ix, y: iy, k });
+      }
+      let present = 0;
+      for (const sl of slots) if (keys.has(sl.k)) { present++; done.add(sl.k); }
+      if (present === slots.length) continue;
+      if (present <= slots.length - present) {
+        return { x: o.x, y: o.y, kind, missing: false };
+      }
+      const gap = slots.find(sl => !keys.has(sl.k));
+      return { x: gap.x, y: gap.y, kind, missing: true };
+    }
+    return null;
+  };
+  const flaw = objFlaw(map.pills, 'pill') || objFlaw(map.bases, 'base');
+  return { ...s, flaw };
+}
+
 const BoloSym = { MODES, transforms, orbit, centreShift, autoParity, contentBox,
-                  spawnsSymmetric, detect, score };
+                  spawnsSymmetric, detect, score, findFlaw };
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = BoloSym;

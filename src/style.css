@@ -41,7 +41,7 @@ body {
 #tools { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
 #symmetry { display: flex; flex-wrap: wrap; gap: 4px; }
 #symParity { display: flex; gap: 4px; margin-top: 4px; }
-button.tool, button.sym, button.sympar, #countFlaws {
+button.tool, button.sym, button.sympar {
   flex: 1 1 40%;
   padding: 6px 4px;
   background: #232a3a;
@@ -52,8 +52,7 @@ button.tool, button.sym, button.sympar, #countFlaws {
   font: inherit;
 }
 button.sym { flex-basis: 30%; }
-button.tool:hover, button.sym:hover, button.sympar:hover, #countFlaws:hover { background: #2c3550; }
-#countFlaws { width: 100%; margin-top: 4px; }
+button.tool:hover, button.sym:hover, button.sympar:hover { background: #2c3550; }
 button.tool.active, button.sym.active, button.sympar.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 button.sympar:disabled { opacity: 0.4; cursor: default; }
 button.sympar:disabled:hover { background: #232a3a; }

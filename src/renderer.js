@@ -775,6 +775,32 @@ function cmdSymmetryScore() {
   statusMsg(`symmetry flaws: ${s.flaws} (closest: ${label(s.mode)}) — ${parts}`, 6000);
 }
 
+/* On demand: locate one concrete flaw — a tile the best mode would
+ * edit — and name it in the status bar. */
+function cmdFindFlaw() {
+  const s = BoloSym.findFlaw(doc);
+  if (!s) {
+    statusMsg('empty map — nothing to check');
+    return;
+  }
+  const label = BoloSym.MODES[s.mode].label;
+  if (s.flaws === 0) {
+    const except = s.spawnsSymmetric ? '' : ' (except spawns)';
+    statusMsg(`no flaws — perfectly ${label} symmetric${except}`, 5000);
+    return;
+  }
+  if (!s.flaw) {
+    statusMsg(`${s.flaws} flaw${s.flaws === 1 ? '' : 's'} counted but none located — please report this`, 6000);
+    return;
+  }
+  const f = s.flaw;
+  const noun = { terrain: 'terrain', pill: 'pillbox', base: 'base' }[f.kind];
+  const what = f.kind === 'terrain'
+    ? 'terrain differs from its mirror image'
+    : (f.missing ? `${noun} missing here` : `${noun} with no mirror image`);
+  statusMsg(`asymmetric tile (${f.x}, ${f.y}): ${what} — judging as ${label}`, 6000);
+}
+
 /* Manual axis-parity override (sets both axes; recentres to match). */
 function setParity(p) {
   if (!symMode) return;
@@ -926,7 +952,6 @@ document.querySelectorAll('button.sym').forEach(b =>
     setSymmetry(b.dataset.sym === 'off' ? null : b.dataset.sym)));
 document.querySelectorAll('button.sympar').forEach(b =>
   b.addEventListener('click', () => setParity(b.dataset.parity)));
-document.getElementById('countFlaws').addEventListener('click', cmdSymmetryScore);
 document.getElementById('brushSize').addEventListener('change', e => {
   brushSize = Number(e.target.value);
 });
@@ -1538,6 +1563,8 @@ api.onMenu(cmd => {
     case 'reset-pills': cmdResetObjects('pill', 'pillboxes'); break;
     case 'reset-bases': cmdResetObjects('base', 'bases'); break;
     case 'buffer-sea': cmdBufferSea(); break;
+    case 'count-flaws': cmdSymmetryScore(); break;
+    case 'find-flaw': cmdFindFlaw(); break;
     case 'apply-all-fixes': cmdApplyAllFixes(); break;
     case 'toggle-pill-range': showPillRange = !showPillRange; requestDraw(); break;
     case 'zoom-in': zoomStep(1); break;

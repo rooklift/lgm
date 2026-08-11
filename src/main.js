@@ -54,6 +54,13 @@ function buildMenu() {
       ],
     },
     {
+      label: '&Queries',
+      submenu: [
+        { label: 'Count symmetry flaws', click: () => send('count-flaws') },
+        { label: 'Find a symmetry flaw', click: () => send('find-flaw') },
+      ],
+    },
+    {
       label: '&View',
       submenu: [
         { label: 'Zoom in', accelerator: 'CmdOrCtrl+=', click: () => send('zoom-in') },
