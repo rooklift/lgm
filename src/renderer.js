@@ -606,6 +606,63 @@ function updateSymUI() {
     : '';
 }
 
+/* Same-type objects sitting on the grabbed object's mirror tiles at
+ * gesture start, each remembering its transform so it can follow the
+ * primary. Matched by position only — nothing is paired persistently,
+ * so hand-edited layouts just yield fewer (or no) followers. */
+function captureDragMirrors(type, index) {
+  const o = doc[OBJECT_LIST[type]][index];
+  const tf = BoloSym.transforms(symMode, symParity);
+  const mirrors = [];
+  const taken = new Set([index]);
+  for (let k = 1; k < tf.length; k++) {
+    const [mx, my] = tf[k].pos(o.x, o.y);
+    const idx = objectAt(type, mx, my);
+    if (idx >= 0 && !taken.has(idx)) {
+      taken.add(idx);
+      mirrors.push({ index: idx, k });
+    }
+  }
+  return mirrors;
+}
+
+/* Move the dragged object so it lands on (tx, ty), then let its captured
+ * mirrors follow, each evaluated one at a time under the normal placement
+ * rules — a mirror whose destination is blocked simply stays behind.
+ * Deliberately no cleverness: dragging the primary onto one of its own
+ * mirrors is an ordinary "tile occupied" refusal, not a swap. */
+function dragObjectTo(tx, ty) {
+  if (!objDrag) return false;
+  const list = doc[OBJECT_LIST[objDrag.type]];
+  const o = list[objDrag.index];
+  const nx = clampRegion(tx), ny = clampRegion(ty);
+  if (objDrag.type === 'start' && doc.grid[ny * MAP_SIZE + nx] !== DEEP_SEA) {
+    statusMsg('spawn points must be on deep sea');
+    return false;
+  }
+  if (tileOccupied(nx, ny, objDrag.type, objDrag.index)) {
+    statusMsg('tile already occupied by another object');
+    return false;
+  }
+  if (!o || (o.x === nx && o.y === ny)) return false;
+  if (!objDrag.undoPushed) { pushUndo(); objDrag.undoPushed = true; }
+  o.x = nx; o.y = ny;
+  const tf = BoloSym.transforms(symMode, symParity);
+  for (const m of objDrag.mirrors || []) {
+    const mo = list[m.index];
+    if (!mo || !tf[m.k]) continue;
+    const [mx, my] = tf[m.k].pos(nx, ny);
+    if (!inRegion(mx, my)) continue; /* even-axis far edge has no image */
+    if (objDrag.type === 'start' && doc.grid[my * MAP_SIZE + mx] !== DEEP_SEA) continue;
+    if (tileOccupied(mx, my, objDrag.type, m.index)) continue;
+    mo.x = mx; mo.y = my;
+  }
+  setDirty(true);
+  renderProps();
+  requestDraw();
+  return true;
+}
+
 function setSymmetry(mode, quiet) {
   if (mode === symMode) return;
   symMode = mode;
@@ -811,7 +868,9 @@ canvas.addEventListener('pointerdown', e => {
    * Delete/Backspace removes the selected object. */
   if (e.button === 2) {
     selected = objectAtAnyType(t.x, t.y);
-    if (selected) objDrag = { ...selected, undoPushed: false };
+    objDrag = selected
+      ? { ...selected, undoPushed: false, mirrors: captureDragMirrors(selected.type, selected.index) }
+      : null;
     renderProps();
     requestDraw();
     return;
@@ -877,10 +936,10 @@ canvas.addEventListener('pointerdown', e => {
           doc[listName].push(o);
         }
         selected = { type: tool, index: doc[listName].length - orbit.length };
-        /* drag-after-place only when there are no mirror copies to desync */
-        objDrag = orbit.length === 1
-          ? { type: tool, index: selected.index, undoPushed: true }
-          : null;
+        /* the just-placed copies become drag followers, so a continued
+         * drag keeps the whole set symmetric */
+        objDrag = { type: tool, index: selected.index, undoPushed: true,
+                    mirrors: captureDragMirrors(tool, selected.index) };
         setDirty(true);
         updateCounts();
       }
@@ -908,23 +967,7 @@ canvas.addEventListener('pointermove', e => {
       requestDraw();
     }
   } else if (objDrag) {
-    const o = doc[OBJECT_LIST[objDrag.type]][objDrag.index];
-    const nx = clampRegion(t.x), ny = clampRegion(t.y);
-    if (objDrag.type === 'start' && doc.grid[ny * MAP_SIZE + nx] !== DEEP_SEA) {
-      statusMsg('spawn points must be on deep sea');
-      return;
-    }
-    if (tileOccupied(nx, ny, objDrag.type, objDrag.index)) {
-      statusMsg('tile already occupied by another object');
-      return;
-    }
-    if (o && (o.x !== nx || o.y !== ny)) {
-      if (!objDrag.undoPushed) { pushUndo(); objDrag.undoPushed = true; }
-      o.x = nx; o.y = ny;
-      setDirty(true);
-      renderProps();
-      requestDraw();
-    }
+    dragObjectTo(t.x, t.y);
   }
 
   updateHoverStatus(t);
