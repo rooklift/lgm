@@ -104,7 +104,12 @@ function parseMap(bytes) {
   grid.fill(DEEP_SEA);
 
   for (;;) {
-    need(4);
+    /* mapReadRuns tests feof before it tests the header read, so a file that
+     * simply ends is a valid end of the run list and the 04 FF FF FF
+     * terminator is effectively optional. Some editors stop on a different
+     * sentinel (04 99 99 99 seen in the wild), which decodes as a harmless
+     * empty run; we then fall out here like WinBolo does. */
+    if (p + 4 > bytes.length) break;
     const datalen = bytes[p], y = bytes[p + 1], startx = bytes[p + 2], endx = bytes[p + 3];
     p += 4;
     if (datalen === 4 && y === 0xff && startx === 0xff && endx === 0xff) break; /* terminator */
