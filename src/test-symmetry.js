@@ -180,6 +180,64 @@ check(r2.dir(0) === 8 && r2.dir(4) === 12, 'R2 dir: E->W, N->S');
   check(BoloSym.detect(m) === null, 'detect: lone unmirrored pill breaks every mode');
 }
 
+/* score(): minimum edits to perfect symmetry, best mode wins. */
+{
+  const blank = () => ({ grid: new Uint8Array(256 * 256).fill(0xff), pills: [], bases: [], starts: [] });
+  const put = (m, x, y, t) => { m.grid[y * 256 + x] = t; };
+  const P = (x, y) => ({ x, y, owner: 255, armour: 15, speed: 50 });
+  const QUAD4 = [[100, 100], [156, 100], [100, 156], [156, 156]];
+
+  check(BoloSym.score(blank()) === null, 'score: empty map is null');
+
+  let m = blank();
+  QUAD4.forEach(([x, y]) => put(m, x, y, 7));
+  let s = BoloSym.score(m);
+  check(s.flaws === 0 && s.mode === 'quad', 'score: perfect quad is 0');
+
+  m = blank();
+  QUAD4.slice(0, 3).forEach(([x, y]) => put(m, x, y, 7)); /* one corner missing */
+  s = BoloSym.score(m);
+  check(s.flaws === 1 && s.mode === 'quad', 'score: quad minus a corner is 1');
+
+  m = blank();
+  QUAD4.forEach(([x, y]) => put(m, x, y, 7));
+  m.pills.push(P(110, 110)); /* lone pill: cheaper to remove than mirror */
+  s = BoloSym.score(m);
+  check(s.flaws === 1, 'score: lone unmirrored pill is 1');
+
+  m = blank();
+  QUAD4.forEach(([x, y]) => put(m, x, y, 7));
+  m.pills.push(P(110, 110), P(146, 110), P(110, 146)); /* 3 of a 4-orbit */
+  s = BoloSym.score(m);
+  check(s.flaws === 1, 'score: pill orbit missing one member is 1');
+
+  m = blank();
+  QUAD4.forEach(([x, y]) => put(m, x, y, 7));
+  m.starts.push({ x: 40, y: 200, dir: 0 }, { x: 231, y: 44, dir: 9 });
+  s = BoloSym.score(m);
+  check(s.flaws === 0, 'score: spawns never count as flaws');
+
+  /* a stray tile stretches the bounding box by one; the axis candidates
+   * one either side of the box's own axis keep the score honest */
+  m = blank();
+  [[100, 100], [156, 100], [128, 90]].forEach(([x, y]) => put(m, x, y, 7));
+  put(m, 157, 120, 7);
+  s = BoloSym.score(m);
+  check(s.flaws === 1 && s.mode === 'h', 'score: stray tile costs 1 despite skewing the box');
+
+  /* off-centre content scores about its own axes, not the board's */
+  m = blank();
+  [[60, 60], [96, 60], [60, 96], [96, 96]].forEach(([x, y]) => put(m, x, y, 7));
+  s = BoloSym.score(m);
+  check(s.flaws === 0 && s.mode === 'quad', 'score: off-centre perfect quad is 0');
+
+  /* perMode carries every mode's own best */
+  m = blank();
+  [[100, 100], [156, 156]].forEach(([x, y]) => put(m, x, y, 7));
+  s = BoloSym.score(m);
+  check(s.perMode.rot180 === 0 && s.perMode.h > 0, 'score: perMode distinguishes modes');
+}
+
 if (failures === 0) {
   console.log('symmetry tests: PASS');
 } else {

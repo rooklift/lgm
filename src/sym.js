@@ -103,7 +103,9 @@ const SIZE = 256, DEEP_SEA = 0xff, LO = 21, HI = 236;
  *
  * Returns { mode, parity, bounds } or null. Preference order when
  * several modes hold: quad, rot90, h, v, rot180. */
-function detect(map) {
+/* Bounding box of terrain plus pills and bases — spawns excluded, since
+ * they are invisible to symmetry checks. Null on an empty map. */
+function contentBox(map) {
   let minX = SIZE, minY = SIZE, maxX = -1, maxY = -1;
   const bump = (x, y) => {
     if (x < minX) minX = x;
@@ -118,8 +120,13 @@ function detect(map) {
   }
   for (const o of map.pills) bump(o.x, o.y);
   for (const o of map.bases) bump(o.x, o.y);
-  if (maxX < 0) return null;
-  const bounds = { minX, minY, maxX, maxY };
+  return maxX < 0 ? null : { minX, minY, maxX, maxY };
+}
+
+function detect(map) {
+  const bounds = contentBox(map);
+  if (!bounds) return null;
+  const { minX, minY, maxX, maxY } = bounds;
 
   /* mirror sums: the x mirror is x -> S-x, so the axis sits at S/2 */
   const S = minX + maxX, T = minY + maxY;
@@ -175,7 +182,137 @@ function detect(map) {
   return null;
 }
 
-const BoloSym = { MODES, transforms, orbit, centreShift, autoParity, detect };
+/* Score a map's symmetry: the minimum number of edits (tile changes,
+ * object additions or removals) that would make it perfectly symmetric,
+ * judged with the same slackness as detect(). 0 means perfect.
+ *
+ * Every mode is tried about a small set of candidate axes — the content
+ * box's own axes, one either side (so a single stray tile distorting
+ * the box doesn't wreck the score), and the board's standard axes —
+ * and the best result wins. Terrain is costed per orbit (orbit size
+ * minus its most common value, wildcarding cells under objects); pills
+ * and bases per position-orbit (the cheaper of adding the missing or
+ * removing the strays).
+ *
+ * Returns { flaws, mode, parity, perMode } or null for an empty map. */
+function score(map) {
+  const b = contentBox(map);
+  if (!b) return null;
+  const S0 = b.minX + b.maxX, T0 = b.minY + b.maxY;
+  const Sc = [...new Set([S0 - 1, S0, S0 + 1, 255, 256])];
+  const Tc = [...new Set([T0 - 1, T0, T0 + 1, 255, 256])];
+
+  const inReg = (x, y) => x >= LO && x < HI && y >= LO && y < HI;
+  const occ = new Set();
+  for (const list of [map.pills, map.bases, map.starts]) {
+    for (const o of list) occ.add(o.y * SIZE + o.x);
+  }
+  const pillKeys = new Set(map.pills.map(o => o.x + ',' + o.y));
+  const baseKeys = new Set(map.bases.map(o => o.x + ',' + o.y));
+
+  const groupOf = (mode, S, T) => {
+    const ID = (x, y) => [x, y];
+    const MX = (x, y) => [S - x, y];
+    const MY = (x, y) => [x, T - y];
+    const R2 = (x, y) => [S - x, T - y];
+    const R1 = (x, y) => [(S + T) / 2 - y, (T - S) / 2 + x];
+    const R3 = (x, y) => [(S - T) / 2 + y, (S + T) / 2 - x];
+    switch (mode) {
+      case 'h':      return [ID, MX];
+      case 'v':      return [ID, MY];
+      case 'quad':   return [ID, MX, MY, R2];
+      case 'rot180': return [ID, R2];
+      default:       return [ID, R1, R2, R3]; /* rot90 */
+    }
+  };
+
+  const objectCost = (list, keys, tf) => {
+    let cost = 0;
+    const done = new Set();
+    for (const o of list) {
+      if (done.has(o.x + ',' + o.y)) continue;
+      const slots = new Set();
+      for (const f of tf) {
+        const [ix, iy] = f(o.x, o.y);
+        slots.add(ix + ',' + iy);
+      }
+      let present = 0;
+      for (const k of slots) if (keys.has(k)) { present++; done.add(k); }
+      cost += Math.min(present, slots.size - present);
+    }
+    return cost;
+  };
+
+  const evalCombo = (mode, S, T) => {
+    const tf = groupOf(mode, S, T);
+    let flaws = 0;
+    const seen = new Uint8Array(SIZE * SIZE);
+    const ox = [], oy = [], vals = [];
+    for (let y = LO; y < HI; y++) {
+      for (let x = LO; x < HI; x++) {
+        if (seen[y * SIZE + x]) continue;
+        ox.length = oy.length = vals.length = 0;
+        for (const f of tf) {
+          const [ix, iy] = f(x, y);
+          let dup = false;
+          for (let i = 0; i < ox.length; i++) {
+            if (ox[i] === ix && oy[i] === iy) { dup = true; break; }
+          }
+          if (!dup) { ox.push(ix); oy.push(iy); }
+        }
+        for (let i = 0; i < ox.length; i++) {
+          const ix = ox[i], iy = oy[i];
+          if (inReg(ix, iy)) {
+            seen[iy * SIZE + ix] = 1;
+            /* cells under objects are wildcards */
+            if (!occ.has(iy * SIZE + ix)) vals.push(map.grid[iy * SIZE + ix]);
+          } else {
+            vals.push(DEEP_SEA); /* off-region reads back as deep sea */
+          }
+        }
+        if (vals.length > 1) {
+          /* orbit cost: everything not matching its most common value */
+          let maxc = 0;
+          for (let i = 0; i < vals.length; i++) {
+            let c = 1;
+            for (let j = i + 1; j < vals.length; j++) if (vals[j] === vals[i]) c++;
+            if (c > maxc) maxc = c;
+          }
+          flaws += vals.length - maxc;
+        }
+      }
+    }
+    return flaws + objectCost(map.pills, pillKeys, tf) + objectCost(map.bases, baseKeys, tf);
+  };
+
+  const perMode = {};
+  let best = null;
+  for (const mode of ['quad', 'rot90', 'h', 'v', 'rot180']) {
+    let m = Infinity;
+    const Ss = mode === 'v' ? [S0] : Sc;
+    const Ts = mode === 'h' ? [T0] : Tc;
+    for (const S of Ss) {
+      for (const T of Ts) {
+        if (mode === 'rot90' && (S + T) % 2 !== 0) continue;
+        const f = evalCombo(mode, S, T);
+        if (f < m) m = f;
+        if (!best || f < best.flaws) best = { flaws: f, mode, S, T };
+      }
+    }
+    perMode[mode] = m;
+  }
+  return {
+    flaws: best.flaws,
+    mode: best.mode,
+    parity: {
+      x: best.S % 2 === 0 ? 'odd' : 'even',
+      y: best.T % 2 === 0 ? 'odd' : 'even',
+    },
+    perMode,
+  };
+}
+
+const BoloSym = { MODES, transforms, orbit, centreShift, autoParity, contentBox, detect, score };
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = BoloSym;

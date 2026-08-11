@@ -533,36 +533,16 @@ function symOrbit(x, y) {
   return BoloSym.orbit(symMode, symParity, x, y);
 }
 
-/* Bounding box of everything that isn't deep sea, plus all objects
- * (spawns sit on deep sea, so terrain alone would miss them). */
-function contentBounds() {
-  let minX = MAP_SIZE, minY = MAP_SIZE, maxX = -1, maxY = -1;
-  for (let y = 0; y < MAP_SIZE; y++) {
-    for (let x = 0; x < MAP_SIZE; x++) {
-      if (doc.grid[y * MAP_SIZE + x] === DEEP_SEA) continue;
-      if (x < minX) minX = x;
-      if (x > maxX) maxX = x;
-      if (y < minY) minY = y;
-      if (y > maxY) maxY = y;
-    }
-  }
-  for (const listName of Object.values(OBJECT_LIST)) {
-    for (const o of doc[listName]) {
-      if (o.x < minX) minX = o.x;
-      if (o.x > maxX) maxX = o.x;
-      if (o.y < minY) minY = o.y;
-      if (o.y > maxY) maxY = o.y;
-    }
-  }
-  return maxX < 0 ? null : { minX, minY, maxX, maxY };
-}
-
 /* Best-effort recentring when symmetry is switched on: shift everything
- * so the content straddles the centre cell (128,128). Content inside the
- * saved region stays inside it (the centred box can't overhang, because
- * the region itself is centred on 128). One undoable step. */
+ * so the content straddles the centre cell (128,128). Bounds come from
+ * BoloSym.contentBox — terrain, pills and bases, but NOT spawns — so the
+ * axes land exactly where load-time detection would put them; symmetry
+ * never looks at spawns, and they must not get a vote on the axes
+ * either. Content inside the saved region stays inside it (the centred
+ * box can't overhang, because the region itself is centred on 128).
+ * One undoable step. */
 function centreContent(boundsOverride) {
-  const b = boundsOverride || contentBounds();
+  const b = boundsOverride || BoloSym.contentBox(doc);
   if (!b) return false;
   const { dx, dy } = BoloSym.centreShift(b, symParity);
   if (!dx && !dy) return false;
@@ -674,8 +654,9 @@ function setSymmetry(mode, quiet) {
   if (mode) {
     /* Every mode click re-derives the axis parity from the content and
      * recentres, exactly as if entering from off — a manual odd/even
-     * override only lasts for the mode it was made in. */
-    const b = contentBounds();
+     * override only lasts for the mode it was made in. Spawn-blind
+     * bounds, so this always agrees with load-time detection. */
+    const b = BoloSym.contentBox(doc);
     symParity = b ? BoloSym.autoParity(b) : { x: 'odd', y: 'odd' };
     /* a quarter-turn has a single centre: both axes must share a parity */
     if (mode === 'rot90' && symParity.x !== symParity.y) {
@@ -710,6 +691,23 @@ function autoDetectSymmetry() {
   const moved = centreContent(found.bounds);
   statusMsg(`this map is ${BoloSym.MODES[found.mode].label} symmetric — symmetry mode on${moved ? ', map recentred' : ''}`, 4000);
   requestDraw();
+}
+
+/* On demand: how far is this map from perfect symmetry? Reports the
+ * minimum-edit count for the best mode, plus every mode's own score. */
+function cmdSymmetryScore() {
+  const s = BoloSym.score(doc);
+  if (!s) {
+    statusMsg('empty map — nothing to score');
+    return;
+  }
+  const label = m => BoloSym.MODES[m].label;
+  if (s.flaws === 0) {
+    statusMsg(`symmetry flaws: 0 — perfectly ${label(s.mode)} symmetric`, 5000);
+    return;
+  }
+  const parts = Object.keys(BoloSym.MODES).map(m => `${label(m)} ${s.perMode[m]}`).join(' · ');
+  statusMsg(`symmetry flaws: ${s.flaws} (closest: ${label(s.mode)}) — ${parts}`, 6000);
 }
 
 /* Manual axis-parity override (sets both axes; recentres to match). */
@@ -842,6 +840,7 @@ document.querySelectorAll('button.sym').forEach(b =>
     setSymmetry(b.dataset.sym === 'off' ? null : b.dataset.sym)));
 document.querySelectorAll('button.sympar').forEach(b =>
   b.addEventListener('click', () => setParity(b.dataset.parity)));
+document.getElementById('countFlaws').addEventListener('click', cmdSymmetryScore);
 document.getElementById('brushSize').addEventListener('change', e => {
   brushSize = Number(e.target.value);
 });
