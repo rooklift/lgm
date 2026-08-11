@@ -842,11 +842,30 @@ function renderProps() {
       if (!Number.isFinite(v)) v = o[field];
       v = Math.max(min, Math.min(max, v));
       input.value = v;
-      if (o[field] !== v) {
-        pushUndo();
-        o[field] = v;
-        setDirty(true);
-        requestDraw();
+      /* Symmetry: a committed direction carries to the spawns on the mirror
+       * tiles, each turned by its own transform. Tolerant like
+       * deleteSelected — mirrors that don't exist (or were moved off their
+       * tile) are simply skipped. Only pairs that actually change are
+       * collected, so a re-commit of the same value stays a no-op while a
+       * commit that only fixes stale mirrors still counts as an edit. */
+      const mirrors = [];
+      if (selected.type === 'start' && field === 'dir') {
+        for (const m of symOrbit(o.x, o.y).slice(1)) {
+          const idx = objectAt('start', m.x, m.y);
+          if (idx < 0 || idx === selected.index) continue;
+          const mo = doc.starts[idx];
+          const md = m.dir(v);
+          if (mo.dir !== md) mirrors.push({ o: mo, dir: md });
+        }
+      }
+      if (o[field] === v && !mirrors.length) return;
+      pushUndo();
+      o[field] = v;
+      for (const m of mirrors) m.o.dir = m.dir;
+      setDirty(true);
+      requestDraw();
+      if (mirrors.length) {
+        statusMsg(`direction mirrored to ${mirrors.length} spawn point${mirrors.length === 1 ? '' : 's'}`);
       }
     });
     row.appendChild(span);
