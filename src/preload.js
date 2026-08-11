@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('api', {
 	confirmDiscard: () => ipcRenderer.invoke('confirm-discard'),
 	showError: (title, message) => ipcRenderer.send('show-error', title, message),
 	onMenu: cb => ipcRenderer.on('menu-cmd', (e, cmd) => cb(cmd)),
+	onSettings: cb => ipcRenderer.on('settings', (e, s) => cb(s)),
 	onConfirmClose: cb => ipcRenderer.on('confirm-close', () => cb()),
 	confirmClose: () => ipcRenderer.send('close-confirmed'),
 });

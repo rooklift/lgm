@@ -1513,6 +1513,14 @@ function cmdOpen() {
 /* map passed on the command line (sent by main once the page loads) */
 api.onLoadMap(({ path, data }) => fileOp(() => loadFromBytes(data, path)));
 
+/* saved settings, pushed by main on every page load; later menu toggles
+ * arrive as menu-cmd and are mirrored into main's settings.json there */
+api.onSettings(s => {
+	showPillRange = !!s.showPillRange;
+	basesAsCircles = !!s.basesAsCircles;
+	requestDraw();
+});
+
 /* main defers a dirty-window close to us, for the same prompt as New/Open.
  * Not gated but waits for the gate: main has already cancelled the close by
  * the time it asks, so a refusal would make the window silently ignore the

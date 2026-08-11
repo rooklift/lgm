@@ -15,6 +15,30 @@ function send(cmd) {
   if (win) win.webContents.send('menu-cmd', cmd);
 }
 
+/* Persistent UI settings. A missing or corrupt file just means defaults. */
+let settings = {};
+let settingsPath = null;
+
+function loadSettings() {
+  settingsPath = path.join(app.getPath('userData'), 'settings.json');
+  try {
+    const parsed = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) settings = parsed;
+  } catch { /* first run, or unreadable */ }
+}
+
+function saveSettings() {
+  try {
+    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
+  } catch { /* non-fatal; the session still works, it just won't persist */ }
+}
+
+function toggleSetting(key, item, cmd) {
+  settings[key] = item.checked;
+  saveSettings();
+  send(cmd);
+}
+
 function buildMenu() {
   const template = [
     {
@@ -68,8 +92,8 @@ function buildMenu() {
         { label: 'Zoom out', accelerator: 'CmdOrCtrl+-', click: () => send('zoom-out') },
         { label: 'Fit map', accelerator: 'CmdOrCtrl+0', click: () => send('zoom-fit') },
         { type: 'separator' },
-        { label: 'Show pillbox range', type: 'checkbox', checked: false, click: () => send('toggle-pill-range') },
-        { label: 'Draw bases as circles', type: 'checkbox', checked: false, click: () => send('toggle-base-circles') },
+        { label: 'Show pillbox range', type: 'checkbox', checked: !!settings.showPillRange, click: item => toggleSetting('showPillRange', item, 'toggle-pill-range') },
+        { label: 'Draw bases as circles', type: 'checkbox', checked: !!settings.basesAsCircles, click: item => toggleSetting('basesAsCircles', item, 'toggle-base-circles') },
         { type: 'separator' },
         { label: "Toggle dev tools", role: 'toggleDevTools' },
       ],
@@ -98,6 +122,12 @@ function createWindow() {
     },
   });
   win.loadFile('index.html');
+
+  /* 'on', not 'once': a reload resets the renderer's flags to defaults,
+   * so the current settings must be re-pushed each load. */
+  win.webContents.on('did-finish-load', () => {
+    win.webContents.send('settings', settings);
+  });
 
   const cliMap = findCliMap();
   if (cliMap) {
@@ -197,6 +227,7 @@ ipcMain.on('set-dirty', (e, d) => { isDirty = !!d; });
 ipcMain.on('close-confirmed', () => { if (win) win.destroy(); });
 
 app.whenReady().then(() => {
+  loadSettings();
   buildMenu();
   createWindow();
 });
