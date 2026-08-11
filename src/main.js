@@ -138,10 +138,28 @@ ipcMain.handle('save-map', async (e, filePath, data) => {
     if (res.canceled) return { canceled: true };
     p = res.filePath;
   }
+  /* Write to a temp file then rename, so a failed write can't destroy the
+     original. 'wx' refuses to open a name that already exists, so a stray
+     pre-existing .tmp file is never clobbered — we just try another name. */
+  let tmp = null;
+  let fd = null;
   try {
-    fs.writeFileSync(p, Buffer.from(data));
+    for (let i = 0; fd === null; i++) {
+      tmp = p + '.tmp' + process.pid + (i > 0 ? '.' + i : '');
+      try {
+        fd = fs.openSync(tmp, 'wx');
+      } catch (err) {
+        if (err.code !== 'EEXIST' || i >= 32) throw err;
+      }
+    }
+    fs.writeFileSync(fd, Buffer.from(data));
+    fs.closeSync(fd);
+    fd = null;
+    fs.renameSync(tmp, p);
     return { canceled: false, path: p };
   } catch (err) {
+    if (fd !== null) { try { fs.closeSync(fd); } catch { /* already closed */ } }
+    try { fs.unlinkSync(tmp); } catch { /* never created, or rename consumed it */ }
     return { canceled: true, error: String(err) };
   }
 });
