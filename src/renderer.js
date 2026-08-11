@@ -1368,10 +1368,20 @@ function loadDoc(map, path) {
   zoomFit();
 }
 
+/* A props-field value still being typed is only committed by its change
+ * event (Enter or blur), which a menu accelerator doesn't trigger — so
+ * anything that serializes or discards the doc must force the commit
+ * first. Blurring the field fires its change handler synchronously. */
+function commitPendingEdit() {
+  const el = document.activeElement;
+  if (el && el.tagName === 'INPUT' && propsEl.contains(el)) el.blur();
+}
+
 /* Never window.confirm()/alert() here: Chromium's blocking dialogs break
  * keyboard focus in Electron (inputs stop accepting typing until the
  * window is refocused), so all prompts go through main's native dialogs. */
 async function confirmDiscard() {
+  commitPendingEdit(); /* an uncommitted edit must count as dirty here */
   if (!dirty) return true;
   return api.confirmDiscard();
 }
@@ -1421,6 +1431,7 @@ window.addEventListener('drop', async e => {
 });
 
 async function cmdSave(as) {
+  commitPendingEdit(); /* must land in the bytes serialized below */
   const savedDoc = doc;
   const savedGen = editGen;
   const bytes = BoloMap.serializeMap(doc);
