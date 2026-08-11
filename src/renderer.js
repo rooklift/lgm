@@ -1479,10 +1479,17 @@ window.addEventListener('drop', async e => {
   loadFromBytes(data, path, ticket);
 });
 
+/* Saves race like loads do: two can be in flight at once and the older one
+ * can finish last. Only the newest completed save may claim the path and the
+ * clean state — an older one names a file holding staler bytes, and its own
+ * editGen check can't see that a newer save already cleared dirty. */
+let saveTicket = 0, saveClaimed = 0;
+
 async function cmdSave(as) {
   commitPendingEdit(); /* must land in the bytes serialized below */
   const savedDoc = doc;
   const savedGen = editGen;
+  const ticket = ++saveTicket;
   const bytes = BoloMap.serializeMap(doc);
   const res = await api.saveMap(as ? null : filePath, bytes);
   if (res.canceled) {
@@ -1492,6 +1499,8 @@ async function cmdSave(as) {
   /* A load that finished while the save was in flight replaced doc; the
    * path and clean state belong to the old document, not this one. */
   if (doc !== savedDoc) return;
+  if (ticket <= saveClaimed) return; /* a newer save already landed */
+  saveClaimed = ticket;
   filePath = res.path;
   /* An edit made while the save was in flight isn't in the bytes just
    * written, so the document must stay dirty relative to the file. */
