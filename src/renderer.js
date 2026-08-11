@@ -163,7 +163,12 @@ function inRegion(x, y) {
 function clampRegion(v) {
   return Math.max(RGN_LO, Math.min(RGN_HI - 1, v));
 }
+/* Bumped on every dirtying change, so an async save can tell whether the
+ * document it serialized is still the document that exists when the write
+ * finishes (edits are possible while the save dialog / disk I/O is open). */
+let editGen = 0;
 function setDirty(d) {
+  if (d) editGen++;
   dirty = d;
   api.setDirty(d);
   updateTitle();
@@ -1377,6 +1382,7 @@ window.addEventListener('drop', async e => {
 });
 
 async function cmdSave(as) {
+  const savedGen = editGen;
   const bytes = BoloMap.serializeMap(doc);
   const res = await api.saveMap(as ? null : filePath, bytes);
   if (res.canceled) {
@@ -1384,7 +1390,9 @@ async function cmdSave(as) {
     return;
   }
   filePath = res.path;
-  setDirty(false);
+  /* An edit made while the save was in flight isn't in the bytes just
+   * written, so the document must stay dirty relative to the file. */
+  if (editGen === savedGen) setDirty(false);
 }
 
 api.onMenu(cmd => {
