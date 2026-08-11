@@ -573,19 +573,52 @@ function centreContent(boundsOverride) {
     }
   }
   doc.grid = ng;
-  /* clampRegion keeps coordinates valid if an object sits outside the
-   * shifted bounds (possible when detection bounds exclude spawns) */
-  for (const listName of Object.values(OBJECT_LIST)) {
+  /* Shifted objects that leave the saved region are deleted, not
+   * clamped: clamping breaks the translation's rigidity, which can
+   * stack spawns or strand them on occupied or non-sea tiles. On a
+   * well-formed map only spawns are exposed — they are excluded from
+   * the symmetry bounds, so a fringe spawn can fall off the edge when
+   * the map shifts. The caller's undo entry restores them. */
+  const dropped = { starts: 0, others: 0 };
+  const selObj = selected ? doc[OBJECT_LIST[selected.type]][selected.index] : null;
+  for (const [type, listName] of Object.entries(OBJECT_LIST)) {
+    const kept = [];
     for (const o of doc[listName]) {
-      o.x = clampRegion(o.x + dx);
-      o.y = clampRegion(o.y + dy);
+      if (inRegion(o.x + dx, o.y + dy)) {
+        o.x += dx;
+        o.y += dy;
+        kept.push(o);
+      } else {
+        dropped[type === 'start' ? 'starts' : 'others']++;
+      }
     }
+    doc[listName] = kept;
+  }
+  if (selObj) {
+    const idx = doc[OBJECT_LIST[selected.type]].indexOf(selObj);
+    selected = idx >= 0 ? { type: selected.type, index: idx } : null;
   }
   rebuildOffscreen();
   setDirty(true);
   renderProps();
   refreshHoverStatus();
-  return true;
+  updateCounts();
+  return { dropped };
+}
+
+/* Status-message suffix for a centreContent result. */
+function recentreNote(moved) {
+  if (!moved) return '';
+  let note = ' — map recentred';
+  const bits = [];
+  if (moved.dropped.starts) {
+    bits.push(`${moved.dropped.starts} spawn${moved.dropped.starts === 1 ? '' : 's'}`);
+  }
+  if (moved.dropped.others) {
+    bits.push(`${moved.dropped.others} other object${moved.dropped.others === 1 ? '' : 's'}`);
+  }
+  if (bits.length) note += `, ${bits.join(' and ')} dropped off the edge`;
+  return note;
 }
 
 function updateSymUI() {
@@ -683,7 +716,7 @@ function setSymmetry(mode, quiet) {
       const note = symParity.x === symParity.y
         ? `${symParity.x} axis`
         : `mixed axis (${symParity.x} x, ${symParity.y} y)`;
-      statusMsg(`symmetry on: ${BoloSym.MODES[mode].label}, ${note}${moved ? ' — map recentred' : ''}`);
+      statusMsg(`symmetry on: ${BoloSym.MODES[mode].label}, ${note}${recentreNote(moved)}`);
     }
   } else {
     updateSymUI();
@@ -707,7 +740,7 @@ function autoDetectSymmetry() {
   const moved = centreContent(found.bounds);
   if (moved) pushUndoEntry(snap);
   const except = found.spawnsSymmetric ? '' : ' (except spawns)';
-  statusMsg(`this map is ${BoloSym.MODES[found.mode].label} symmetric${except} — symmetry mode on${moved ? ', map recentred' : ''}`, 4000);
+  statusMsg(`this map is ${BoloSym.MODES[found.mode].label} symmetric${except} — symmetry mode on${recentreNote(moved)}`, 4000);
   requestDraw();
 }
 
@@ -738,7 +771,7 @@ function setParity(p) {
   updateSymUI();
   const moved = centreContent();
   if (moved) pushUndoEntry(snap);
-  statusMsg(`symmetry axis: ${p === 'odd' ? 'through tile 128' : 'between tiles 127 and 128'}${moved ? ' — map recentred' : ''}`);
+  statusMsg(`symmetry axis: ${p === 'odd' ? 'through tile 128' : 'between tiles 127 and 128'}${recentreNote(moved)}`);
   requestDraw();
 }
 
@@ -1350,7 +1383,8 @@ window.addEventListener('drop', async e => {
 async function cmdSave(as) {
   /* Pill/base stats are not editable in the GUI (their editors and the
    * reset-fixes are dormant), so force defaults into the file here.
-   * The in-memory doc is left untouched. */
+   * The in-memory doc is left untouched. We accept that this overwrites
+   * non-normal objects in loaded maps. */
   const bytes = BoloMap.serializeMap({
     ...doc,
     pills: doc.pills.map(o => ({ ...o, ...OBJECT_DEFAULTS.pill })),
