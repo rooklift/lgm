@@ -494,15 +494,29 @@ function objectAtAnyType(x, y) {
 
 function deleteSelected() {
   if (!selected) return;
-  const list = doc[OBJECT_LIST[selected.type]];
-  if (!list[selected.index]) { selected = null; return; }
+  const { type } = selected;
+  const listName = OBJECT_LIST[type];
+  const list = doc[listName];
+  const o = list[selected.index];
+  if (!o) { selected = null; return; }
   pushUndo();
-  list.splice(selected.index, 1);
+  /* Symmetry: any same-type objects on the mirror tiles go too. Tolerant
+   * by design — mirrors that don't exist (or were moved off their tile)
+   * are simply skipped, so this also works on hand-edited layouts. */
+  const doomed = new Set([selected.index]);
+  for (const m of symOrbit(o.x, o.y).slice(1)) {
+    const idx = objectAt(type, m.x, m.y);
+    if (idx >= 0) doomed.add(idx);
+  }
+  doc[listName] = list.filter((_, i) => !doomed.has(i));
   selected = null;
   setDirty(true);
   updateCounts();
   renderProps();
   requestDraw();
+  if (doomed.size > 1) {
+    statusMsg(`deleted ${doomed.size} mirrored ${OBJECT_LABEL_PLURAL[type]}`);
+  }
 }
 
 /* Is any object (of any type) on this tile, other than the excluded one? */
