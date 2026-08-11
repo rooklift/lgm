@@ -1313,9 +1313,9 @@ function cmdFixSpawnDirs(quiet) {
 }
 
 /* Reset all objects of a type to neutral ownership and default stats. */
-function cmdResetObjects(type, label, quiet) {
+function cmdResetObjects(type, label, quiet, overrides) {
   const list = doc[OBJECT_LIST[type]];
-  const defaults = OBJECT_DEFAULTS[type];
+  const defaults = { ...OBJECT_DEFAULTS[type], ...overrides };
   if (!list.length) return false;
   if (list.every(o => Object.entries(defaults).every(([k, v]) => o[k] === v))) {
     if (!quiet) statusMsg(`${label} already at defaults`);
@@ -1561,6 +1561,7 @@ api.onMenu(cmd => {
     case 'fix-start-order': cmdFixOrder('starts', 'spawns', SPAWN_SLOTS); break;
     case 'fix-start-dirs': cmdFixSpawnDirs(); break;
     case 'reset-pills': cmdResetObjects('pill', 'pillboxes'); break;
+    case 'reset-pills-slow': cmdResetObjects('pill', 'pillboxes', false, { speed: 100 }); break;
     case 'reset-bases': cmdResetObjects('base', 'bases'); break;
     case 'buffer-sea': cmdBufferSea(); break;
     case 'count-flaws': cmdSymmetryScore(); break;
