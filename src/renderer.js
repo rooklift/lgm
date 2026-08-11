@@ -1053,7 +1053,10 @@ canvas.addEventListener('pointermove', e => {
   updateHoverStatus(t);
 });
 
-canvas.addEventListener('pointerup', () => {
+/* Idempotent: also reached via pointercancel / lostpointercapture / blur,
+ * so a gesture can't stay live after the OS or a focus change eats the
+ * pointerup (which would let bare hover keep painting or dragging). */
+function endGesture() {
   if (painting && selected) renderProps(); /* refresh "terrain under" readout */
   painting = false;
   lastTile = null;
@@ -1061,6 +1064,13 @@ canvas.addEventListener('pointerup', () => {
   panStart = null;
   objDrag = null;
   canvas.style.cursor = spaceDown ? 'grab' : 'crosshair';
+}
+canvas.addEventListener('pointerup', endGesture);
+canvas.addEventListener('pointercancel', endGesture);
+canvas.addEventListener('lostpointercapture', endGesture);
+window.addEventListener('blur', () => {
+  spaceDown = false; /* the matching keyup will never arrive */
+  endGesture();
 });
 
 canvas.addEventListener('wheel', e => {
