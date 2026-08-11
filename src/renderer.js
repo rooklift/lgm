@@ -141,6 +141,7 @@ function restore(snap) {
   rebuildOffscreen();
   renderProps();
   refreshHoverStatus();
+  updateCounts();
   setDirty(true);
   requestDraw();
 }
