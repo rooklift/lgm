@@ -330,13 +330,23 @@ function draw() {
 	const iconR = Math.max(4, z * 0.45);
 	const font = `${Math.max(8, Math.round(z * 0.6))}px sans-serif`;
 	for (const [i, b] of doc.bases.entries()) {
-		drawObject('base', i, b, iconR, font);
+		drawObject('base', i, b, iconR);
 	}
 	for (const [i, p] of doc.pills.entries()) {
-		drawObject('pill', i, p, iconR, font);
+		drawObject('pill', i, p, iconR);
 	}
 	for (const [i, s] of doc.starts.entries()) {
-		drawObject('start', i, s, iconR, font);
+		drawObject('start', i, s, iconR);
+	}
+	/* labels in a second pass so no object can be drawn over them */
+	for (const [i, b] of doc.bases.entries()) {
+		drawObjectLabel(i, b, iconR, font);
+	}
+	for (const [i, p] of doc.pills.entries()) {
+		drawObjectLabel(i, p, iconR, font);
+	}
+	for (const [i, s] of doc.starts.entries()) {
+		drawObjectLabel(i, s, iconR, font);
 	}
 
 	/* symmetry axes / centre marker: through the middle of tile 128 for an
@@ -373,7 +383,7 @@ function draw() {
 	}
 }
 
-function drawObject(type, index, o, r, font) {
+function drawObject(type, index, o, r) {
 	const z = view.zoom;
 	const cx = tileToScreenX(o.x) + z / 2;
 	const cy = tileToScreenY(o.y) + z / 2;
@@ -421,12 +431,17 @@ function drawObject(type, index, o, r, font) {
 		ctx.lineWidth = 2;
 		ctx.strokeRect(cx - r - 3, cy - r - 3, (r + 3) * 2, (r + 3) * 2);
 	}
-	if (view.zoom >= 10) {
-		ctx.fillStyle = '#fff';
-		ctx.font = font;
-		ctx.textAlign = 'center';
-		ctx.fillText(String(index + 1), cx, cy - r - 3);
-	}
+}
+
+function drawObjectLabel(index, o, r, font) {
+	if (view.zoom < 10) return;
+	const z = view.zoom;
+	const cx = tileToScreenX(o.x) + z / 2;
+	const cy = tileToScreenY(o.y) + z / 2;
+	ctx.fillStyle = '#fff';
+	ctx.font = font;
+	ctx.textAlign = 'center';
+	ctx.fillText(String(index + 1), cx, cy - r - 3);
 }
 
 /* ---------- editing ---------- */
