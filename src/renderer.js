@@ -8,7 +8,7 @@ const RGN_LO = EDGE_MIN + 1;   /* 21, inclusive */
 const RGN_HI = EDGE_MAX;       /* 236, exclusive */
 
 /* Refuse to slurp files that can't possibly be maps (a maximal legal map
- * is ~27 KB). Keep in sync with MAX_MAP_BYTES in main.js. */
+ * is ~113 KB). Keep in sync with MAX_MAP_BYTES in main.js. */
 const MAX_MAP_BYTES = 1 << 20;
 
 const TERRAIN_COLORS = {

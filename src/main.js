@@ -11,8 +11,9 @@ const MAP_FILTERS = [
   { name: 'All files', extensions: ['*'] },
 ];
 
-/* Sanity ceiling for files we handle as maps; comfortably above the ~27 KB
- * a maximal legal map serializes to, but small enough to refuse a huge
+/* Sanity ceiling for files we handle as maps; comfortably above the ~113 KB
+ * a maximal legal map serializes to (a checkerboard against sea: every
+ * isolated tile is its own 5-byte run), but small enough to refuse a huge
  * unrelated file that ended up under a .map name. */
 const MAX_MAP_BYTES = 1 << 20;
 
@@ -202,10 +203,10 @@ ipcMain.handle('save-map', async (e, filePath, data) => {
       if (err.code !== 'ENOENT') throw err; /* no original: plain write below */
     }
     if (existing) {
-      /* The largest legal map is ~27 KB (215 saved rows of at most ~125
-         RLE bytes each, plus objects). Anything wildly bigger is not a
-         map we wrote — the user may have dropped some other file onto
-         this name — so refuse to touch it rather than back it up. */
+      /* The largest legal map is ~113 KB (see MAX_MAP_BYTES). Anything
+         wildly bigger is not a map we wrote — the user may have dropped
+         some other file onto this name — so refuse to touch it rather
+         than back it up. */
       if (existing.size > MAX_MAP_BYTES) {
         return { canceled: true, error:
           `The copy of ${p} on disk is now ${existing.size} bytes. Not overwriting it; use Save As.` };
