@@ -1487,6 +1487,11 @@ async function fileOp(fn) {
 	fileOpDone = new Promise(r => { release = r; });
 	try {
 		return await fn();
+	} catch (err) {
+		/* Command bodies show their own dialogs and aren't expected to
+		 * throw; a rejection escaping one would otherwise vanish into the
+		 * devtools console, the command silently doing nothing. */
+		api.showError('Unexpected error', String(err));
 	} finally {
 		fileOpDone = null;
 		release();
@@ -1562,7 +1567,15 @@ window.addEventListener('drop', e => {
 			return;
 		}
 		if (!await confirmDiscard()) return;
-		const data = new Uint8Array(await file.arrayBuffer());
+		let data;
+		try {
+			data = new Uint8Array(await file.arrayBuffer());
+		} catch (err) {
+			/* the file can vanish between the drop and the read (removable
+			 * media, a temp file cleaned up) — surface it like any open error */
+			api.showError('Could not open map', String(err));
+			return;
+		}
 		let path = null;
 		try { path = api.pathForFile(file) || null; } catch { /* keep null: Save will ask */ }
 		loadFromBytes(data, path);
