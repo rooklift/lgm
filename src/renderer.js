@@ -113,6 +113,7 @@ function snapshot() {
 		selected: selected ? { ...selected } : null,
 		symMode,
 		symParity: { ...symParity },
+		gen: editGen, /* identity of the state captured — see refreshDirty */
 	};
 }
 /* For edits whose snapshot must predate other state changes (mode or
@@ -138,12 +139,13 @@ function restore(snap) {
 	selected = snap.selected ? { ...snap.selected } : null;
 	symMode = snap.symMode;
 	symParity = { ...snap.symParity };
+	editGen = snap.gen;
 	updateSymUI();
 	rebuildOffscreen();
 	renderProps();
 	refreshHoverStatus();
 	updateCounts();
-	setDirty(true);
+	refreshDirty(); /* undoing back to the saved state makes the doc clean */
 	requestDraw();
 }
 /* Undo/redo/delete can fire mid-gesture (menu accelerators and the
@@ -170,15 +172,23 @@ function inRegion(x, y) {
 function clampRegion(v) {
 	return Math.max(RGN_LO, Math.min(RGN_HI - 1, v));
 }
-/* Bumped on every dirtying change, so an async save can tell whether the
- * document it serialized is still the document that exists when the write
+/* Bumped on every dirtying change, so editGen names the current document
+ * state: snapshots carry it and restore() brings it back, which is what
+ * lets undo/redo recognise the exact state a save wrote (no close prompt
+ * after undoing back to it). It also lets an async save tell whether the
+ * document it serialized is still the one that exists when the write
  * finishes (edits are possible while the save dialog / disk I/O is open). */
 let editGen = 0;
+let lastSavedGen = 0; /* gen of the state the file on disk holds */
+function refreshDirty() {
+	dirty = (editGen !== lastSavedGen);
+	api.setDirty(dirty);
+	updateTitle();
+}
 function setDirty(d) {
 	if (d) editGen++;
-	dirty = d;
-	api.setDirty(d);
-	updateTitle();
+	else lastSavedGen = editGen; /* current state becomes the on-disk baseline */
+	refreshDirty();
 }
 function updateTitle() {
 	const name = filePath ? filePath.replace(/^.*[\\/]/, '') : 'untitled.map';
@@ -1557,10 +1567,13 @@ function cmdSave(as) {
 			return;
 		}
 		filePath = res.path;
-		/* An edit made while the save was in flight isn't in the bytes just
-		 * written, so the document must stay dirty relative to the file. */
-		if (editGen === savedGen) setDirty(false);
-		else updateTitle(); /* Save As renamed the doc even though it stays dirty */
+		/* The bytes just written hold the state at savedGen. An edit made
+		 * while the save was in flight isn't in them, so the document stays
+		 * dirty — but undoing back to savedGen's state makes it clean again,
+		 * because the file really does match. refreshDirty also picks up a
+		 * Save As rename even when the doc stays dirty. */
+		lastSavedGen = savedGen;
+		refreshDirty();
 	});
 }
 
