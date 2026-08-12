@@ -7,6 +7,10 @@ const { MAP_SIZE, DEEP_SEA, TERRAIN_NAMES, EDGE_MIN, EDGE_MAX } = BoloMap;
 const RGN_LO = EDGE_MIN + 1;   /* 21, inclusive */
 const RGN_HI = EDGE_MAX;       /* 236, exclusive */
 
+/* Refuse to slurp files that can't possibly be maps (a maximal legal map
+ * is ~27 KB). Keep in sync with MAX_MAP_BYTES in main.js. */
+const MAX_MAP_BYTES = 1 << 20;
+
 const TERRAIN_COLORS = {
 	0:  '#8a6b4a',  /* building */
 	1:  '#3f7fe0',  /* river */
@@ -1553,6 +1557,10 @@ window.addEventListener('drop', e => {
 	const file = e.dataTransfer.files[0]; /* read now: dataTransfer empties after the event */
 	if (!file) return;
 	fileOp(async () => {
+		if (file.size > MAX_MAP_BYTES) {
+			api.showError('Could not open map', `${file.name} is ${file.size} bytes, far larger than any Bolo map.`);
+			return;
+		}
 		if (!await confirmDiscard()) return;
 		const data = new Uint8Array(await file.arrayBuffer());
 		let path = null;

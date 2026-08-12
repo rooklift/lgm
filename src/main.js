@@ -11,6 +11,11 @@ const MAP_FILTERS = [
   { name: 'All files', extensions: ['*'] },
 ];
 
+/* Sanity ceiling for files we handle as maps; comfortably above the ~27 KB
+ * a maximal legal map serializes to, but small enough to refuse a huge
+ * unrelated file that ended up under a .map name. */
+const MAX_MAP_BYTES = 1 << 20;
+
 function send(cmd) {
   if (win) win.webContents.send('menu-cmd', cmd);
 }
@@ -133,6 +138,8 @@ function createWindow() {
   if (cliMap) {
     win.webContents.once('did-finish-load', () => {
       try {
+        const size = fs.statSync(cliMap).size;
+        if (size > MAX_MAP_BYTES) throw new Error(`${cliMap} is ${size} bytes, far larger than any Bolo map.`);
         win.webContents.send('load-map', { path: cliMap, data: new Uint8Array(fs.readFileSync(cliMap)) });
       } catch (err) {
         dialog.showErrorBox('Could not open map', String(err));
@@ -159,6 +166,10 @@ ipcMain.handle('open-map', async () => {
   if (res.canceled || res.filePaths.length === 0) return { canceled: true };
   const p = res.filePaths[0];
   try {
+    const size = fs.statSync(p).size;
+    if (size > MAX_MAP_BYTES) {
+      return { canceled: true, error: `${p} is ${size} bytes, far larger than any Bolo map.` };
+    }
     return { canceled: false, path: p, data: new Uint8Array(fs.readFileSync(p)) };
   } catch (err) {
     return { canceled: true, error: String(err) };
@@ -175,28 +186,56 @@ ipcMain.handle('save-map', async (e, filePath, data) => {
     if (res.canceled) return { canceled: true };
     p = res.filePath;
   }
-  /* Write to a temp file then rename, so a failed write can't destroy the
-     original. 'wx' refuses to open a name that already exists, so a stray
-     pre-existing .tmp file is never clobbered — we just try another name. */
-  let tmp = null;
-  let fd = null;
+  /* Overwrite in place, so the destination keeps its file identity —
+     writing a temp file and renaming it over p makes a new directory
+     entry, which loses the desktop icon position, creation date and
+     ACLs. The old content is copied to a backup first, so a failed
+     write still can't destroy it; the backup is removed once the write
+     lands. COPYFILE_EXCL refuses a name that already exists, so a stray
+     pre-existing backup is never clobbered — we just try another name. */
+  let bak = null;
   try {
-    for (let i = 0; fd === null; i++) {
-      tmp = p + '.tmp' + process.pid + (i > 0 ? '.' + i : '');
-      try {
-        fd = fs.openSync(tmp, 'wx');
-      } catch (err) {
-        if (err.code !== 'EEXIST' || i >= 32) throw err;
+    let existing = null;
+    try {
+      existing = fs.statSync(p);
+    } catch (err) {
+      if (err.code !== 'ENOENT') throw err; /* no original: plain write below */
+    }
+    if (existing) {
+      /* The largest legal map is ~27 KB (215 saved rows of at most ~125
+         RLE bytes each, plus objects). Anything wildly bigger is not a
+         map we wrote — the user may have dropped some other file onto
+         this name — so refuse to touch it rather than back it up. */
+      if (existing.size > MAX_MAP_BYTES) {
+        return { canceled: true, error:
+          `The copy of ${p} on disk is now ${existing.size} bytes. Not overwriting it; use Save As.` };
+      }
+      for (let i = 0; bak === null; i++) {
+        const name = p + '.bak' + process.pid + (i > 0 ? '.' + i : '');
+        try {
+          fs.copyFileSync(p, name, fs.constants.COPYFILE_EXCL);
+          bak = name;
+        } catch (err) {
+          if (err.code !== 'EEXIST' || i >= 32) throw err;
+        }
       }
     }
-    fs.writeFileSync(fd, Buffer.from(data));
-    fs.closeSync(fd);
-    fd = null;
-    fs.renameSync(tmp, p);
+    try {
+      fs.writeFileSync(p, Buffer.from(data));
+    } catch (err) {
+      if (!bak) throw err; /* nothing was at p, so nothing was lost */
+      try {
+        fs.copyFileSync(bak, p); /* p may be truncated or partial: put the original back */
+        fs.unlinkSync(bak);
+        return { canceled: true, error: `${err} — the original file is unchanged.` };
+      } catch {
+        return { canceled: true, error: `${err} — the original content is preserved in ${bak}` };
+      }
+    }
+    /* The save itself succeeded past this point, whatever the cleanup does. */
+    if (bak) { try { fs.unlinkSync(bak); } catch { /* a leftover backup is harmless */ } }
     return { canceled: false, path: p };
   } catch (err) {
-    if (fd !== null) { try { fs.closeSync(fd); } catch { /* already closed */ } }
-    try { fs.unlinkSync(tmp); } catch { /* never created, or rename consumed it */ }
     return { canceled: true, error: String(err) };
   }
 });
