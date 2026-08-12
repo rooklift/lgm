@@ -249,7 +249,7 @@ ipcMain.handle('confirm-discard', async () => {
   const res = await dialog.showMessageBox(win, {
     type: 'warning',
     buttons: ['Discard', 'Cancel'],
-    defaultId: 0,
+    defaultId: 1, /* Enter cancels: a destructive action must not be the reflex default */
     cancelId: 1,
     noLink: true,
     message: 'Discard unsaved changes?',
