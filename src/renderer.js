@@ -172,13 +172,18 @@ function inRegion(x, y) {
 function clampRegion(v) {
 	return Math.max(RGN_LO, Math.min(RGN_HI - 1, v));
 }
-/* Bumped on every dirtying change, so editGen names the current document
- * state: snapshots carry it and restore() brings it back, which is what
- * lets undo/redo recognise the exact state a save wrote (no close prompt
- * after undoing back to it). It also lets an async save tell whether the
- * document it serialized is still the one that exists when the write
- * finishes (edits are possible while the save dialog / disk I/O is open). */
+/* editGen names the current document state: snapshots carry it and
+ * restore() brings it back, which is what lets undo/redo recognise the
+ * exact state a save wrote (no close prompt after undoing back to it).
+ * It also lets an async save tell whether the document it serialized is
+ * still the one that exists when the write finishes (edits are possible
+ * while the save dialog / disk I/O is open).
+ *
+ * New ids come from genCounter, which never decreases even when restore()
+ * winds editGen back — otherwise edit A, edit B, save, undo, edit C would
+ * mint C the saved state's id and pass A+C off as the saved A+B. */
 let editGen = 0;
+let genCounter = 0; /* high-water mark of ids ever minted */
 let lastSavedGen = 0; /* gen of the state the file on disk holds */
 function refreshDirty() {
 	dirty = (editGen !== lastSavedGen);
@@ -186,7 +191,7 @@ function refreshDirty() {
 	updateTitle();
 }
 function setDirty(d) {
-	if (d) editGen++;
+	if (d) editGen = ++genCounter;
 	else lastSavedGen = editGen; /* current state becomes the on-disk baseline */
 	refreshDirty();
 }
