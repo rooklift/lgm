@@ -192,7 +192,7 @@ function setDirty(d) {
 }
 function updateTitle() {
 	const name = filePath ? filePath.replace(/^.*[\\/]/, '') : 'untitled.map';
-	document.title = `${name}${dirty ? ' •' : ''} — Bolo Map Editor`;
+	document.title = `${name}${dirty ? ' •' : ''}`;
 }
 /* Transient messages live in their own full-width div (#statusMessage),
  * which always holds the last message; showing it temporarily swaps out
