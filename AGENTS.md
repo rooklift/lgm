@@ -6,3 +6,4 @@
 - Spawn points theoretically deleted while loading a symmetric map
 - Any bugs where a spawn direction being typed live might be lost
 - After confirming a file load, no second confirmation if the old file was edited further
+- Near-simultaneous edit and close not causing confirmation due to IPC race
