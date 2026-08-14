@@ -843,6 +843,26 @@ function cmdFindFlaw() {
 	statusMsg(`asymmetric tile (${f.x}, ${f.y}): ${what} — judging as ${label}`, 6000);
 }
 
+/* On demand: report every pillbox speed value in use. */
+function cmdPillSpeeds() {
+	if (doc.pills.length === 0) {
+		statusMsg('no pillboxes on the map');
+		return;
+	}
+	const counts = new Map();
+	for (const p of doc.pills) counts.set(p.speed, (counts.get(p.speed) || 0) + 1);
+	if (counts.size === 1) {
+		const [speed] = counts.keys();
+		statusMsg(`all ${doc.pills.length} pillboxes have speed ${speed}`, 5000);
+		return;
+	}
+	const parts = [...counts.entries()]
+		.sort(([va, ca], [vb, cb]) => cb - ca || vb - va)
+		.map(([v, c]) => `${v} (${c})`)
+		.join(', ');
+	statusMsg(`speeds: ${parts}`, 6000);
+}
+
 /* Manual axis-parity override (sets both axes; recentres to match). */
 function setParity(p) {
 	if (!symMode) return;
@@ -1636,6 +1656,7 @@ api.onMenu(cmd => {
 		case 'buffer-sea': cmdBufferSea(); break;
 		case 'count-flaws': cmdSymmetryScore(); break;
 		case 'find-flaw': cmdFindFlaw(); break;
+		case 'pill-speeds': cmdPillSpeeds(); break;
 		case 'apply-all-fixes': cmdApplyAllFixes(); break;
 		case 'toggle-pill-range': showPillRange = !showPillRange; requestDraw(); break;
 		case 'toggle-base-circles': basesAsCircles = !basesAsCircles; requestDraw(); break;

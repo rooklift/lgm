@@ -89,6 +89,7 @@ function buildMenu() {
 			submenu: [
 				{ label: 'Count symmetry flaws', click: () => send('count-flaws') },
 				{ label: 'Find a symmetry flaw', click: () => send('find-flaw') },
+				{ label: 'Pillbox speeds', click: () => send('pill-speeds') },
 			],
 		},
 		{
