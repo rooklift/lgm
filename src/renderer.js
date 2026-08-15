@@ -808,13 +808,12 @@ function cmdSymmetryScore() {
 		return;
 	}
 	const label = m => BoloSym.MODES[m].label;
-	if (s.flaws === 0) {
-		const except = s.spawnsSymmetric ? '' : ' (except spawns)';
-		statusMsg(`symmetry flaws: 0 — perfectly ${label(s.mode)} symmetric${except}`, 5000);
-		return;
-	}
 	const parts = Object.keys(BoloSym.MODES).map(m => `${label(m)} ${s.perMode[m]}`).join(' · ');
-	statusMsg(`symmetry flaws: ${s.flaws} (closest: ${label(s.mode)}) — ${parts}`, 6000);
+	const except = s.spawnsSymmetric ? '' : ' (except spawns)';
+	const head = s.flaws === 0
+		? `symmetry flaws: 0 — perfectly ${label(s.mode)} symmetric${except}`
+		: `symmetry flaws: ${s.flaws} (closest: ${label(s.mode)})`;
+	statusMsg(`${head} — ${parts}`, 6000);
 }
 
 /* On demand: locate one concrete flaw — a tile the best mode would
