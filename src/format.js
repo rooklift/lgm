@@ -192,8 +192,11 @@ function serializeMap(map) {
 	const out = [];
 	for (let i = 0; i < 8; i++) out.push('BMAPBOLO'.charCodeAt(i));
 	out.push(1, map.pills.length, map.bases.length, map.starts.length);
-	for (const p of map.pills) out.push(p.x, p.y, p.owner, p.armour, p.speed);
-	for (const b of map.bases) out.push(b.x, b.y, b.owner, b.armour, b.shells, b.mines);
+	/* WinBolo saves NEUTRAL as 16 (players are 0-15); the classic spec and
+	 * nearly every map in the wild use 0xff. Normalise on save. */
+	const owner = o => o === 16 ? 0xff : o;
+	for (const p of map.pills) out.push(p.x, p.y, owner(p.owner), p.armour, p.speed);
+	for (const b of map.bases) out.push(b.x, b.y, owner(b.owner), b.armour, b.shells, b.mines);
 	for (const s of map.starts) out.push(s.x, s.y, s.dir);
 
 	let x = 0, y = 0;

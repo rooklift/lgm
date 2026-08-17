@@ -28,8 +28,11 @@ if (out.length === orig.length && out.every((b, i) => b === orig[i])) {
 	/* Fall back to semantic comparison */
 	const re = BoloMap.parseMap(out);
 	const gridsEqual = re.grid.every((t, i) => t === map.grid[i]);
+	/* serializeMap normalises WinBolo's neutral owner (16) to 0xff, so the
+	 * original must be normalised the same way before comparing. */
+	const norm = list => list.map(o => ({ ...o, owner: o.owner === 16 ? 255 : o.owner }));
 	const objsEqual = JSON.stringify([re.pills, re.bases, re.starts]) ===
-										JSON.stringify([map.pills, map.bases, map.starts]);
+										JSON.stringify([norm(map.pills), norm(map.bases), map.starts]);
 	console.log(`semantic round trip (grid ${gridsEqual ? 'equal' : 'DIFFERS'}, objects ${objsEqual ? 'equal' : 'DIFFER'}): ${gridsEqual && objsEqual ? 'PASS' : 'FAIL'}`);
 	process.exitCode = gridsEqual && objsEqual ? 0 : 1;
 }
