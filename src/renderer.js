@@ -203,9 +203,10 @@ function updateTitle() {
 	const name = filePath ? filePath.replace(/^.*[\\/]/, '') : 'untitled.map';
 	document.title = `${name}${dirty ? ' •' : ''}`;
 }
-/* Transient messages live in their own full-width div (#statusMessage),
- * which always holds the last message; showing it temporarily swaps out
- * the whole info row. The timer only toggles visibility, never content. */
+/* Transient messages live in their own div (#statusMessage), which always
+ * holds the last message; showing it temporarily swaps out the info row
+ * (the mouse-coordinate div stays put). The timer only toggles visibility,
+ * never content. */
 let statusMsgTimer = null;
 function statusMsg(text, holdMs = 2500) {
 	statusMessage.textContent = text;

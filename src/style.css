@@ -118,6 +118,8 @@ select, input[type="number"] {
 
 #status {
 	flex: none;
+	display: flex;
+	gap: 18px;
 	overflow: hidden;
 	padding: 4px 10px;
 	background: var(--panel);
@@ -126,12 +128,12 @@ select, input[type="number"] {
 	font-size: 12px;
 	white-space: nowrap;
 }
-#statusInfo { display: flex; gap: 18px; overflow: hidden; }
-#statusInfo span:first-child { min-width: 90px; }
+#statusPos { flex: none; min-width: 90px; }
+#statusInfo { flex: 1; min-width: 0; display: flex; gap: 18px; overflow: hidden; }
 #statusTerrain { min-width: 110px; color: var(--text); }
 #statusSym { color: var(--accent); }
 #statusHint { margin-left: auto; }
 /* the two are swapped by toggling .msg on #status */
-#statusMessage { display: none; color: #ffd479; }
+#statusMessage { display: none; flex: 1; min-width: 0; overflow: hidden; color: #ffd479; }
 #status.msg #statusInfo { display: none; }
 #status.msg #statusMessage { display: block; }
