@@ -1437,14 +1437,14 @@ function cmdBufferSea(quiet) {
 }
 
 /* Run every fix as one undoable step. */
-function cmdApplyAllFixes() {
+function cmdApplyAllFixes(pillOverrides) {
 	const snap = snapshot();
 	const changed = [
 		cmdFixOrder('pills', 'pillboxes', STATUS_SLOTS, true),
 		cmdFixOrder('bases', 'bases', STATUS_SLOTS, true),
 		cmdFixOrder('starts', 'spawns', SPAWN_SLOTS, true),
 		cmdFixSpawnDirs(true),
-		cmdResetObjects('pill', 'pillboxes', true),
+		cmdResetObjects('pill', 'pillboxes', true, pillOverrides),
 		cmdResetObjects('base', 'bases', true),
 	].filter(Boolean).length;
 	if (!changed) {
@@ -1658,6 +1658,7 @@ api.onMenu(cmd => {
 		case 'find-flaw': cmdFindFlaw(); break;
 		case 'pill-speeds': cmdPillSpeeds(); break;
 		case 'apply-all-fixes': cmdApplyAllFixes(); break;
+		case 'apply-all-fixes-slow': cmdApplyAllFixes({ speed: 100 }); break;
 		case 'toggle-pill-range': showPillRange = !showPillRange; requestDraw(); break;
 		case 'toggle-base-circles': basesAsCircles = !basesAsCircles; requestDraw(); break;
 		case 'zoom-in': zoomStep(1); break;
