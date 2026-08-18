@@ -1,14 +1,14 @@
-'use strict';
-const { app, BrowserWindow, Menu, dialog, ipcMain } = require('electron');
-const fs = require('fs');
-const path = require('path');
+"use strict";
+const { app, BrowserWindow, Menu, dialog, ipcMain } = require("electron");
+const fs = require("fs");
+const path = require("path");
 
 let win = null;
-let isDirty = false;
+let is_dirty = false;
 
 const MAP_FILTERS = [
-	{ name: 'Bolo maps', extensions: ['map'] },
-	{ name: 'All files', extensions: ['*'] },
+	{ name: "Bolo maps", extensions: ["map"] },
+	{ name: "All files", extensions: ["*"] },
 ];
 
 /* Sanity ceiling for files we handle as maps; comfortably above the ~113 KB
@@ -18,94 +18,94 @@ const MAP_FILTERS = [
 const MAX_MAP_BYTES = 1 << 20;
 
 function send(cmd) {
-	if (win) win.webContents.send('menu-cmd', cmd);
+	if (win) win.webContents.send("menu-cmd", cmd);
 }
 
 /* Persistent UI settings. A missing or corrupt file just means defaults. */
 let settings = {};
-let settingsPath = null;
+let settings_path = null;
 
-function loadSettings() {
-	settingsPath = path.join(app.getPath('userData'), 'settings.json');
+function load_settings() {
+	settings_path = path.join(app.getPath("userData"), "settings.json");
 	try {
-		const parsed = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
-		if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) settings = parsed;
+		let parsed = JSON.parse(fs.readFileSync(settings_path, "utf8"));
+		if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) settings = parsed;
 	} catch { /* first run, or unreadable */ }
 }
 
-function saveSettings() {
+function save_settings() {
 	try {
-		fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
+		fs.writeFileSync(settings_path, JSON.stringify(settings, null, 2) + "\n");
 	} catch { /* non-fatal; the session still works, it just won't persist */ }
 }
 
-function toggleSetting(key, item, cmd) {
+function toggle_setting(key, item, cmd) {
 	settings[key] = item.checked;
-	saveSettings();
+	save_settings();
 	send(cmd);
 }
 
-function buildMenu() {
-	const template = [
+function build_menu() {
+	let template = [
 		{
-			label: '&File',
+			label: "&File",
 			submenu: [
-				{ label: 'New', accelerator: 'CmdOrCtrl+N', click: () => send('new') },
-				{ label: 'Open…', accelerator: 'CmdOrCtrl+O', click: () => send('open') },
-				{ type: 'separator' },
-				{ label: 'Save', accelerator: 'CmdOrCtrl+S', click: () => send('save') },
-				{ label: 'Save as…', accelerator: 'CmdOrCtrl+Shift+S', click: () => send('save-as') },
-				{ type: 'separator' },
-				{ role: 'quit' },
+				{ label: "New", accelerator: "CmdOrCtrl+N", click: () => send("new") },
+				{ label: "Open…", accelerator: "CmdOrCtrl+O", click: () => send("open") },
+				{ type: "separator" },
+				{ label: "Save", accelerator: "CmdOrCtrl+S", click: () => send("save") },
+				{ label: "Save as…", accelerator: "CmdOrCtrl+Shift+S", click: () => send("save-as") },
+				{ type: "separator" },
+				{ role: "quit" },
 			],
 		},
 		{
-			label: '&Edit',
+			label: "&Edit",
 			submenu: [
-				{ label: 'Undo', accelerator: 'CmdOrCtrl+Z', click: () => send('undo') },
-				{ label: 'Redo', accelerator: 'CmdOrCtrl+Y', click: () => send('redo') },
+				{ label: "Undo", accelerator: "CmdOrCtrl+Z", click: () => send("undo") },
+				{ label: "Redo", accelerator: "CmdOrCtrl+Y", click: () => send("redo") },
 			],
 		},
 		{
-			label: 'Fi&xes',
+			label: "Fi&xes",
 			submenu: [
-				{ label: 'Fix base order', click: () => send('fix-base-order') },
-				{ label: 'Fix pillbox order', click: () => send('fix-pill-order') },
-				{ label: 'Fix spawn order', click: () => send('fix-start-order') },
-				{ type: 'separator' },
-				{ label: 'Fix spawn directions', click: () => send('fix-start-dirs') },
-				{ type: 'separator' },
-				{ label: 'Reset bases', click: () => send('reset-bases') },
-				{ type: 'separator' },
-				{ label: 'Reset pillboxes (wait 50)', click: () => send('reset-pills') },
-				{ label: 'Reset pillboxes (wait 100)', click: () => send('reset-pills-slow') },
-				{ type: 'separator' },
-				{ label: 'Apply all fixes above (wait 50)', click: () => send('apply-all-fixes') },
-				{ label: 'Apply all fixes above (wait 100)', click: () => send('apply-all-fixes-slow') },
-				{ type: 'separator' },
-				{ label: 'Buffer the sea', click: () => send('buffer-sea') },
+				{ label: "Fix base order", click: () => send("fix-base-order") },
+				{ label: "Fix pillbox order", click: () => send("fix-pill-order") },
+				{ label: "Fix spawn order", click: () => send("fix-start-order") },
+				{ type: "separator" },
+				{ label: "Fix spawn directions", click: () => send("fix-start-dirs") },
+				{ type: "separator" },
+				{ label: "Reset bases", click: () => send("reset-bases") },
+				{ type: "separator" },
+				{ label: "Reset pillboxes (wait 50)", click: () => send("reset-pills") },
+				{ label: "Reset pillboxes (wait 100)", click: () => send("reset-pills-slow") },
+				{ type: "separator" },
+				{ label: "Apply all fixes above (wait 50)", click: () => send("apply-all-fixes") },
+				{ label: "Apply all fixes above (wait 100)", click: () => send("apply-all-fixes-slow") },
+				{ type: "separator" },
+				{ label: "Buffer the sea", click: () => send("buffer-sea") },
 
 			],
 		},
 		{
-			label: '&Queries',
+			label: "&Queries",
 			submenu: [
-				{ label: 'Count symmetry flaws', click: () => send('count-flaws') },
-				{ label: 'Find a symmetry flaw', click: () => send('find-flaw') },
-				{ label: 'Pillbox speeds', click: () => send('pill-speeds') },
+				{ label: "Count symmetry flaws", click: () => send("count-flaws") },
+				{ label: "Find a symmetry flaw", click: () => send("find-flaw") },
+				{ label: "Pillbox speeds", click: () => send("pill-speeds") },
 			],
 		},
 		{
-			label: '&View',
+			label: "&View",
 			submenu: [
-				{ label: 'Zoom in', accelerator: 'CmdOrCtrl+=', click: () => send('zoom-in') },
-				{ label: 'Zoom out', accelerator: 'CmdOrCtrl+-', click: () => send('zoom-out') },
-				{ label: 'Fit map', accelerator: 'CmdOrCtrl+0', click: () => send('zoom-fit') },
-				{ type: 'separator' },
-				{ label: 'Show pillbox range', type: 'checkbox', checked: !!settings.showPillRange, click: item => toggleSetting('showPillRange', item, 'toggle-pill-range') },
-				{ label: 'Draw bases as circles', type: 'checkbox', checked: !!settings.basesAsCircles, click: item => toggleSetting('basesAsCircles', item, 'toggle-base-circles') },
-				{ type: 'separator' },
-				{ label: "Toggle dev tools", role: 'toggleDevTools' },
+				{ label: "Zoom in", accelerator: "CmdOrCtrl+=", click: () => send("zoom-in") },
+				{ label: "Zoom out", accelerator: "CmdOrCtrl+-", click: () => send("zoom-out") },
+				{ label: "Fit map", accelerator: "CmdOrCtrl+0", click: () => send("zoom-fit") },
+				{ type: "separator" },
+				{ label: "Show pillbox range", type: "checkbox", checked: !!settings.showPillRange, click: item => toggle_setting("showPillRange", item, "toggle-pill-range") },
+				{ label: "Draw bases as circles", type: "checkbox", checked: !!settings.basesAsCircles, click: item => toggle_setting("basesAsCircles", item, "toggle-base-circles") },
+				{ type: "separator" },
+				{ label: "Toggle dev tools", role: "toggleDevTools" },
 			],
 		},
 	];
@@ -113,65 +113,65 @@ function buildMenu() {
 }
 
 /* A .map file given on the command line (e.g. `electron . islands.map`) */
-function findCliMap() {
-	for (const arg of process.argv.slice(1)) {
+function find_cli_map() {
+	for (let arg of process.argv.slice(1)) {
 		if (/\.map$/i.test(arg) && fs.existsSync(arg)) return path.resolve(arg);
 	}
 	return null;
 }
 
-function createWindow() {
+function create_window() {
 	win = new BrowserWindow({
 		width: 1280,
 		height: 860,
-		backgroundColor: '#10131a',
+		backgroundColor: "#10131a",
 		webPreferences: {
-			preload: path.join(__dirname, 'preload.js'),
+			preload: path.join(__dirname, "preload.js"),
 			contextIsolation: true,
 			nodeIntegration: false,
 		},
 	});
-	win.loadFile('index.html');
+	win.loadFile("index.html");
 
-	/* 'on', not 'once': a reload resets the renderer's flags to defaults,
+	/* "on", not "once": a reload resets the renderer's flags to defaults,
 	 * so the current settings must be re-pushed each load. */
-	win.webContents.on('did-finish-load', () => {
-		win.webContents.send('settings', settings);
+	win.webContents.on("did-finish-load", () => {
+		win.webContents.send("settings", settings);
 	});
 
-	const cliMap = findCliMap();
-	if (cliMap) {
-		win.webContents.once('did-finish-load', () => {
+	let cli_map = find_cli_map();
+	if (cli_map) {
+		win.webContents.once("did-finish-load", () => {
 			try {
-				const size = fs.statSync(cliMap).size;
-				if (size > MAX_MAP_BYTES) throw new Error(`${cliMap} is ${size} bytes, far larger than any Bolo map.`);
-				win.webContents.send('load-map', { path: cliMap, data: new Uint8Array(fs.readFileSync(cliMap)) });
+				let size = fs.statSync(cli_map).size;
+				if (size > MAX_MAP_BYTES) throw new Error(`${cli_map} is ${size} bytes, far larger than any Bolo map.`);
+				win.webContents.send("load-map", { path: cli_map, data: new Uint8Array(fs.readFileSync(cli_map)) });
 			} catch (err) {
-				dialog.showErrorBox('Could not open map', String(err));
+				dialog.showErrorBox("Could not open map", String(err));
 			}
 		});
 	}
 
 	/* Closing a dirty window defers to the renderer, which asks with the
 	 * same discard prompt used by New/Open, then requests a real close. */
-	win.on('close', e => {
-		if (isDirty) {
+	win.on("close", e => {
+		if (is_dirty) {
 			e.preventDefault();
-			win.webContents.send('confirm-close');
+			win.webContents.send("confirm-close");
 		}
 	});
-	win.on('closed', () => { win = null; });
+	win.on("closed", () => { win = null; });
 }
 
-ipcMain.handle('open-map', async () => {
-	const res = await dialog.showOpenDialog(win, {
+ipcMain.handle("open-map", async () => {
+	let res = await dialog.showOpenDialog(win, {
 		filters: MAP_FILTERS,
-		properties: ['openFile'],
+		properties: ["openFile"],
 	});
 	if (res.canceled || res.filePaths.length === 0) return { canceled: true };
-	const p = res.filePaths[0];
+	let p = res.filePaths[0];
 	try {
-		const size = fs.statSync(p).size;
+		let size = fs.statSync(p).size;
 		if (size > MAX_MAP_BYTES) {
 			return { canceled: true, error: `${p} is ${size} bytes, far larger than any Bolo map.` };
 		}
@@ -181,12 +181,12 @@ ipcMain.handle('open-map', async () => {
 	}
 });
 
-ipcMain.handle('save-map', async (e, filePath, data) => {
-	let p = filePath;
+ipcMain.handle("save-map", async (e, file_path, data) => {
+	let p = file_path;
 	if (!p) {
-		const res = await dialog.showSaveDialog(win, {
+		let res = await dialog.showSaveDialog(win, {
 			filters: MAP_FILTERS,
-			defaultPath: 'untitled.map',
+			defaultPath: "untitled.map",
 		});
 		if (res.canceled) return { canceled: true };
 		p = res.filePath;
@@ -204,7 +204,7 @@ ipcMain.handle('save-map', async (e, filePath, data) => {
 		try {
 			existing = fs.statSync(p);
 		} catch (err) {
-			if (err.code !== 'ENOENT') throw err; /* no original: plain write below */
+			if (err.code !== "ENOENT") throw err; /* no original: plain write below */
 		}
 		if (existing) {
 			/* The largest legal map is ~113 KB (see MAX_MAP_BYTES). Anything
@@ -216,12 +216,12 @@ ipcMain.handle('save-map', async (e, filePath, data) => {
 					`The copy of ${p} on disk is now ${existing.size} bytes. Not overwriting it; use Save As.` };
 			}
 			for (let i = 0; bak === null; i++) {
-				const name = p + '.bak' + process.pid + (i > 0 ? '.' + i : '');
+				let name = p + ".bak" + process.pid + (i > 0 ? "." + i : "");
 				try {
 					fs.copyFileSync(p, name, fs.constants.COPYFILE_EXCL);
 					bak = name;
 				} catch (err) {
-					if (err.code !== 'EEXIST' || i >= 32) throw err;
+					if (err.code !== "EEXIST" || i >= 32) throw err;
 				}
 			}
 		}
@@ -249,30 +249,30 @@ ipcMain.handle('save-map', async (e, filePath, data) => {
  * blocking dialogs, keyboard focus breaks and inputs stop accepting
  * typing until the window is refocused (electron#19977 or #31917).
  * Native dialogs from the main process don't have that problem. */
-ipcMain.handle('confirm-discard', async () => {
-	const res = await dialog.showMessageBox(win, {
-		type: 'warning',
-		buttons: ['Discard', 'Cancel'],
+ipcMain.handle("confirm-discard", async () => {
+	let res = await dialog.showMessageBox(win, {
+		type: "warning",
+		buttons: ["Discard", "Cancel"],
 		defaultId: 1, /* Enter cancels: a destructive action must not be the reflex default */
 		cancelId: 1,
 		noLink: true,
-		message: 'Discard unsaved changes?',
+		message: "Discard unsaved changes?",
 	});
 	return res.response === 0;
 });
 
-ipcMain.on('show-error', (e, title, message) => {
+ipcMain.on("show-error", (e, title, message) => {
 	dialog.showErrorBox(title, message);
 });
 
-ipcMain.on('set-dirty', (e, d) => { isDirty = !!d; });
+ipcMain.on("set-dirty", (e, d) => { is_dirty = !!d; });
 
-/* destroy() skips the 'close' event, so the dirty check can't re-fire */
-ipcMain.on('close-confirmed', () => { if (win) win.destroy(); });
+/* destroy() skips the "close" event, so the dirty check can't re-fire */
+ipcMain.on("close-confirmed", () => { if (win) win.destroy(); });
 
 app.whenReady().then(() => {
-	loadSettings();
-	buildMenu();
-	createWindow();
+	load_settings();
+	build_menu();
+	create_window();
 });
-app.on('window-all-closed', () => app.quit());
+app.on("window-all-closed", () => app.quit());

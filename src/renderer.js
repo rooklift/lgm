@@ -1,4 +1,4 @@
-'use strict';
+"use strict";
 /* Bolo map editor renderer: canvas view, painting tools, objects, undo. */
 
 const { MAP_SIZE, DEEP_SEA, TERRAIN_NAMES, EDGE_MIN, EDGE_MAX } = BoloMap;
@@ -12,27 +12,27 @@ const RGN_HI = EDGE_MAX;       /* 236, exclusive */
 const MAX_MAP_BYTES = 1 << 20;
 
 const TERRAIN_COLORS = {
-	0:  '#8a6b4a',  /* building */
-	1:  '#3f7fe0',  /* river */
-	2:  '#6b7d3f',  /* swamp */
-	3:  '#5a5a66',  /* crater */
-	4:  '#3a3a3a',  /* road */
-	5:  '#58a848',  /* forest */
-	6:  '#857a6a',  /* rubble */
-	7:  '#1e5c2e',  /* grass */
-	8:  '#8c8c99',  /* shot building */
-	9:  '#a8c4ee',  /* boat on river */
-	255: '#123a6b', /* deep sea */
+	0:  "#8a6b4a",  /* building */
+	1:  "#3f7fe0",  /* river */
+	2:  "#6b7d3f",  /* swamp */
+	3:  "#5a5a66",  /* crater */
+	4:  "#3a3a3a",  /* road */
+	5:  "#58a848",  /* forest */
+	6:  "#857a6a",  /* rubble */
+	7:  "#1e5c2e",  /* grass */
+	8:  "#8c8c99",  /* shot building */
+	9:  "#a8c4ee",  /* boat on river */
+	255: "#123a6b", /* deep sea */
 };
 const RGB = {};
 for (let t = 0; t <= 9; t++) {
-	const c = parseInt(TERRAIN_COLORS[t].slice(1), 16);
+	let c = parseInt(TERRAIN_COLORS[t].slice(1), 16);
 	RGB[t] = [(c >> 16) & 255, (c >> 8) & 255, c & 255];
 }
 /* Mined variants share the base terrain colour; the red dot marks the mine */
 for (let t = 10; t <= 15; t++) RGB[t] = RGB[t - 8];
 {
-	const c = parseInt(TERRAIN_COLORS[255].slice(1), 16);
+	let c = parseInt(TERRAIN_COLORS[255].slice(1), 16);
 	RGB[255] = [(c >> 16) & 255, (c >> 8) & 255, c & 255];
 }
 
@@ -42,69 +42,69 @@ const OBJECT_DEFAULTS = {
 	start: { dir: 0 },
 };
 const OBJECT_FIELDS = {
-	pill:  [['owner', 0, 255], ['armour', 0, 15], ['speed', 0, 255]],
-	base:  [['owner', 0, 255], ['armour', 0, 90], ['shells', 0, 90], ['mines', 0, 90]],
-	start: [['dir', 0, 15]],
+	pill:  [["owner", 0, 255], ["armour", 0, 15], ["speed", 0, 255]],
+	base:  [["owner", 0, 255], ["armour", 0, 90], ["shells", 0, 90], ["mines", 0, 90]],
+	start: [["dir", 0, 15]],
 };
-const OBJECT_LIST = { pill: 'pills', base: 'bases', start: 'starts' };
-const OBJECT_LABEL = { pill: 'pillbox', base: 'base', start: 'spawn' };
-const OBJECT_LABEL_PLURAL = { pill: 'pillboxes', base: 'bases', start: 'spawns' };
+const OBJECT_LIST = { pill: "pills", base: "bases", start: "starts" };
+const OBJECT_LABEL = { pill: "pillbox", base: "base", start: "spawn" };
+const OBJECT_LABEL_PLURAL = { pill: "pillboxes", base: "bases", start: "spawns" };
 
 /* ---------- state ---------- */
-let doc = BoloMap.newMap();
-let filePath = null;
+let doc = BoloMap.new_map();
+let file_path = null;
 let dirty = false;
 
-let tool = 'paint';
+let tool = "paint";
 let terrain = 7; /* grass */
-let brushSize = 1;
+let brush_size = 1;
 let selected = null; /* {type, index} */
-let showPillRange = false;
-let basesAsCircles = false;
-let symMode = null; /* null | 'h' | 'v' | 'quad' | 'rot180' | 'rot90' */
-let symParity = { x: 'odd', y: 'odd' }; /* 'odd': axis through tile 128; 'even': between 127 and 128 */
+let show_pill_range = false;
+let bases_as_circles = false;
+let sym_mode = null; /* null | "h" | "v" | "quad" | "rot180" | "rot90" */
+let sym_parity = { x: "odd", y: "odd" }; /* "odd": axis through tile 128; "even": between 127 and 128 */
 
 const PILL_RANGE = 8; /* tiles */
 
 const ZOOMS = [1, 2, 3, 4, 6, 8, 12, 16, 24, 32];
-const view = { zoom: 3, ox: 0, oy: 0 };
+let view = { zoom: 3, ox: 0, oy: 0 };
 
-const undoStack = [];
-const redoStack = [];
 const UNDO_MAX = 100;
+let undo_stack = [];
+let redo_stack = [];
 
 /* ---------- DOM ---------- */
-const canvas = document.getElementById('view');
-const ctx = canvas.getContext('2d');
-const statusBar = document.getElementById('status');
-const statusMessage = document.getElementById('statusMessage');
-const statusPos = document.getElementById('statusPos');
-const statusTerrain = document.getElementById('statusTerrain');
-const statusZoom = document.getElementById('statusZoom');
-const statusSym = document.getElementById('statusSym');
-const countsEl = document.getElementById('counts');
-const propsEl = document.getElementById('props');
+let canvas = document.getElementById("view");
+let ctx = canvas.getContext("2d");
+let status_bar = document.getElementById("status");
+let status_message = document.getElementById("statusMessage");
+let status_pos = document.getElementById("statusPos");
+let status_terrain = document.getElementById("statusTerrain");
+let status_zoom = document.getElementById("statusZoom");
+let status_sym = document.getElementById("statusSym");
+let counts_el = document.getElementById("counts");
+let props_el = document.getElementById("props");
 
 /* offscreen 1px-per-tile terrain image */
-const off = document.createElement('canvas');
+let off = document.createElement("canvas");
 off.width = off.height = MAP_SIZE;
-const offCtx = off.getContext('2d');
-const offImg = offCtx.createImageData(MAP_SIZE, MAP_SIZE);
+let off_ctx = off.getContext("2d");
+let off_img = off_ctx.createImageData(MAP_SIZE, MAP_SIZE);
 
-function rebuildOffscreen() {
-	const d = offImg.data;
+function rebuild_offscreen() {
+	let d = off_img.data;
 	for (let i = 0; i < MAP_SIZE * MAP_SIZE; i++) {
-		const [r, g, b] = RGB[doc.grid[i]] || RGB[255];
+		let [r, g, b] = RGB[doc.grid[i]] || RGB[255];
 		d[i * 4] = r; d[i * 4 + 1] = g; d[i * 4 + 2] = b; d[i * 4 + 3] = 255;
 	}
-	offCtx.putImageData(offImg, 0, 0);
+	off_ctx.putImageData(off_img, 0, 0);
 }
-function updateOffPixel(x, y) {
-	const i = y * MAP_SIZE + x;
-	const [r, g, b] = RGB[doc.grid[i]] || RGB[255];
-	const d = offImg.data;
+function update_off_pixel(x, y) {
+	let i = y * MAP_SIZE + x;
+	let [r, g, b] = RGB[doc.grid[i]] || RGB[255];
+	let d = off_img.data;
 	d[i * 4] = r; d[i * 4 + 1] = g; d[i * 4 + 2] = b; d[i * 4 + 3] = 255;
-	offCtx.putImageData(offImg, 0, 0, x, y, 1, 1);
+	off_ctx.putImageData(off_img, 0, 0, x, y, 1, 1);
 }
 
 /* ---------- undo ---------- */
@@ -115,21 +115,21 @@ function snapshot() {
 		bases: doc.bases.map(o => ({ ...o })),
 		starts: doc.starts.map(o => ({ ...o })),
 		selected: selected ? { ...selected } : null,
-		symMode,
-		symParity: { ...symParity },
-		gen: editGen, /* identity of the state captured — see refreshDirty */
+		sym_mode,
+		sym_parity: { ...sym_parity },
+		gen: edit_gen, /* identity of the state captured — see refresh_dirty */
 	};
 }
 /* For edits whose snapshot must predate other state changes (mode or
  * parity switches that recentre): take the snapshot first, mutate,
  * then push it only if something actually changed. */
-function pushUndoEntry(snap) {
-	undoStack.push(snap);
-	if (undoStack.length > UNDO_MAX) undoStack.shift();
-	redoStack.length = 0;
+function push_undo_entry(snap) {
+	undo_stack.push(snap);
+	if (undo_stack.length > UNDO_MAX) undo_stack.shift();
+	redo_stack.length = 0;
 }
-function pushUndo() {
-	pushUndoEntry(snapshot());
+function push_undo() {
+	push_undo_entry(snapshot());
 }
 /* The restored selection is valid by construction: it was captured in
  * the same snapshot as the lists it indexes into. Symmetry mode and
@@ -141,154 +141,154 @@ function restore(snap) {
 	doc.bases = snap.bases;
 	doc.starts = snap.starts;
 	selected = snap.selected ? { ...snap.selected } : null;
-	symMode = snap.symMode;
-	symParity = { ...snap.symParity };
-	editGen = snap.gen;
-	updateSymUI();
-	rebuildOffscreen();
-	renderProps();
-	refreshHoverStatus();
-	updateCounts();
-	refreshDirty(); /* undoing back to the saved state makes the doc clean */
-	requestDraw();
+	sym_mode = snap.sym_mode;
+	sym_parity = { ...snap.sym_parity };
+	edit_gen = snap.gen;
+	update_sym_ui();
+	rebuild_offscreen();
+	render_props();
+	refresh_hover_status();
+	update_counts();
+	refresh_dirty(); /* undoing back to the saved state makes the doc clean */
+	request_draw();
 }
 /* Undo/redo/delete can fire mid-gesture (menu accelerators and the
  * Delete key work while a button is held); ending the gesture first
  * keeps a live drag or stroke from acting on stale indices into the
  * restored/filtered lists. */
 function undo() {
-	if (!undoStack.length) return;
-	endGesture();
-	redoStack.push(snapshot());
-	restore(undoStack.pop());
+	if (!undo_stack.length) return;
+	end_gesture();
+	redo_stack.push(snapshot());
+	restore(undo_stack.pop());
 }
 function redo() {
-	if (!redoStack.length) return;
-	endGesture();
-	undoStack.push(snapshot());
-	restore(redoStack.pop());
+	if (!redo_stack.length) return;
+	end_gesture();
+	undo_stack.push(snapshot());
+	restore(redo_stack.pop());
 }
 
 /* ---------- helpers ---------- */
-function inRegion(x, y) {
+function in_region(x, y) {
 	return x >= RGN_LO && x < RGN_HI && y >= RGN_LO && y < RGN_HI;
 }
-function clampRegion(v) {
+function clamp_region(v) {
 	return Math.max(RGN_LO, Math.min(RGN_HI - 1, v));
 }
-/* editGen names the current document state: snapshots carry it and
+/* edit_gen names the current document state: snapshots carry it and
  * restore() brings it back, which is what lets undo/redo recognise the
  * exact state a save wrote (no close prompt after undoing back to it).
  * It also lets an async save tell whether the document it serialized is
  * still the one that exists when the write finishes (edits are possible
  * while the save dialog / disk I/O is open).
  *
- * New ids come from genCounter, which never decreases even when restore()
- * winds editGen back — otherwise edit A, edit B, save, undo, edit C would
+ * New ids come from gen_counter, which never decreases even when restore()
+ * winds edit_gen back — otherwise edit A, edit B, save, undo, edit C would
  * mint C the saved state's id and pass A+C off as the saved A+B. */
-let editGen = 0;
-let genCounter = 0; /* high-water mark of ids ever minted */
-let lastSavedGen = 0; /* gen of the state the file on disk holds */
-function refreshDirty() {
-	dirty = (editGen !== lastSavedGen);
-	api.setDirty(dirty);
-	updateTitle();
+let edit_gen = 0;
+let gen_counter = 0; /* high-water mark of ids ever minted */
+let last_saved_gen = 0; /* gen of the state the file on disk holds */
+function refresh_dirty() {
+	dirty = (edit_gen !== last_saved_gen);
+	api.set_dirty(dirty);
+	update_title();
 }
-function setDirty(d) {
-	if (d) editGen = ++genCounter;
-	else lastSavedGen = editGen; /* current state becomes the on-disk baseline */
-	refreshDirty();
+function set_dirty(d) {
+	if (d) edit_gen = ++gen_counter;
+	else last_saved_gen = edit_gen; /* current state becomes the on-disk baseline */
+	refresh_dirty();
 }
-function updateTitle() {
-	const name = filePath ? filePath.replace(/^.*[\\/]/, '') : 'untitled.map';
-	document.title = `${name}${dirty ? ' •' : ''}`;
+function update_title() {
+	let name = file_path ? file_path.replace(/^.*[\\/]/, "") : "untitled.map";
+	document.title = `${name}${dirty ? " •" : ""}`;
 }
 /* Transient messages live in their own div (#statusMessage), which always
  * holds the last message; showing it temporarily swaps out the info row
  * (the mouse-coordinate div stays put). The timer only toggles visibility,
  * never content. */
-let statusMsgTimer = null;
-function statusMsg(text, holdMs = 2500) {
-	statusMessage.textContent = text;
-	statusBar.classList.add('msg');
-	clearTimeout(statusMsgTimer);
-	statusMsgTimer = setTimeout(() => statusBar.classList.remove('msg'), holdMs);
+let status_msg_timer = null;
+function status_msg(text, hold_ms = 2500) {
+	status_message.textContent = text;
+	status_bar.classList.add("msg");
+	clearTimeout(status_msg_timer);
+	status_msg_timer = setTimeout(() => status_bar.classList.remove("msg"), hold_ms);
 }
 
-function updateCounts() {
-	countsEl.textContent =
+function update_counts() {
+	counts_el.textContent =
 		`pillboxes ${doc.pills.length}/16 · bases ${doc.bases.length}/16 · spawns ${doc.starts.length}/16`;
 }
 
 /* ---------- drawing ---------- */
-let drawQueued = false;
-function requestDraw() {
-	if (drawQueued) return;
-	drawQueued = true;
-	requestAnimationFrame(() => { drawQueued = false; draw(); });
+let draw_queued = false;
+function request_draw() {
+	if (draw_queued) return;
+	draw_queued = true;
+	requestAnimationFrame(() => { draw_queued = false; draw(); });
 }
 
-function screenToTile(mx, my) {
+function screen_to_tile(mx, my) {
 	return {
 		x: Math.floor(view.ox + mx / view.zoom),
 		y: Math.floor(view.oy + my / view.zoom),
 	};
 }
-function tileToScreenX(tx) { return (tx - view.ox) * view.zoom; }
-function tileToScreenY(ty) { return (ty - view.oy) * view.zoom; }
+function tile_to_screen_x(tx) { return (tx - view.ox) * view.zoom; }
+function tile_to_screen_y(ty) { return (ty - view.oy) * view.zoom; }
 
-function cssSize() {
+function css_size() {
 	return { w: canvas.clientWidth, h: canvas.clientHeight };
 }
 
-function clampView() {
-	const { w, h } = cssSize();
-	const tw = w / view.zoom, th = h / view.zoom;
-	const margin = 16;
+function clamp_view() {
+	let { w, h } = css_size();
+	let tw = w / view.zoom, th = h / view.zoom;
+	let margin = 16;
 	view.ox = Math.max(-tw + margin, Math.min(MAP_SIZE - margin, view.ox));
 	view.oy = Math.max(-th + margin, Math.min(MAP_SIZE - margin, view.oy));
 }
 
 function draw() {
-	const { w, h } = cssSize();
-	const z = view.zoom;
+	let { w, h } = css_size();
+	let z = view.zoom;
 	ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-	ctx.fillStyle = '#0a0e16';
+	ctx.fillStyle = "#0a0e16";
 	ctx.fillRect(0, 0, w, h);
 
 	ctx.imageSmoothingEnabled = false;
 	ctx.drawImage(off, view.ox, view.oy, w / z, h / z, 0, 0, w, h);
 
 	/* darken the strip WinBolo won't save (outside 21..235) */
-	const rx0 = tileToScreenX(RGN_LO), ry0 = tileToScreenY(RGN_LO);
-	const rx1 = tileToScreenX(RGN_HI), ry1 = tileToScreenY(RGN_HI);
-	ctx.fillStyle = 'rgba(0,0,0,0.4)';
-	const mx0 = tileToScreenX(0), my0 = tileToScreenY(0);
-	const mx1 = tileToScreenX(MAP_SIZE), my1 = tileToScreenY(MAP_SIZE);
+	let rx0 = tile_to_screen_x(RGN_LO), ry0 = tile_to_screen_y(RGN_LO);
+	let rx1 = tile_to_screen_x(RGN_HI), ry1 = tile_to_screen_y(RGN_HI);
+	ctx.fillStyle = "rgba(0,0,0,0.4)";
+	let mx0 = tile_to_screen_x(0), my0 = tile_to_screen_y(0);
+	let mx1 = tile_to_screen_x(MAP_SIZE), my1 = tile_to_screen_y(MAP_SIZE);
 	ctx.fillRect(mx0, my0, mx1 - mx0, Math.max(0, ry0 - my0));            /* top */
 	ctx.fillRect(mx0, ry1, mx1 - mx0, Math.max(0, my1 - ry1));            /* bottom */
 	ctx.fillRect(mx0, ry0, Math.max(0, rx0 - mx0), ry1 - ry0);            /* left */
 	ctx.fillRect(rx1, ry0, Math.max(0, mx1 - rx1), ry1 - ry0);            /* right */
-	ctx.strokeStyle = 'rgba(255,120,120,0.5)';
+	ctx.strokeStyle = "rgba(255,120,120,0.5)";
 	ctx.lineWidth = 1;
 	ctx.strokeRect(rx0 + 0.5, ry0 + 0.5, rx1 - rx0 - 1, ry1 - ry0 - 1);
 
 	/* visible tile range */
-	const tx0 = Math.max(0, Math.floor(view.ox));
-	const ty0 = Math.max(0, Math.floor(view.oy));
-	const tx1 = Math.min(MAP_SIZE, Math.ceil(view.ox + w / z));
-	const ty1 = Math.min(MAP_SIZE, Math.ceil(view.oy + h / z));
+	let tx0 = Math.max(0, Math.floor(view.ox));
+	let ty0 = Math.max(0, Math.floor(view.oy));
+	let tx1 = Math.min(MAP_SIZE, Math.ceil(view.ox + w / z));
+	let ty1 = Math.min(MAP_SIZE, Math.ceil(view.oy + h / z));
 
 	/* mine dots — the sole mine indicator, so drawn at every zoom */
 	{
-		const r = Math.max(0.5, z * 0.28);
-		ctx.fillStyle = '#ff3b30';
-		ctx.strokeStyle = '#7a0000';
+		let r = Math.max(0.5, z * 0.28);
+		ctx.fillStyle = "#ff3b30";
+		ctx.strokeStyle = "#7a0000";
 		for (let ty = ty0; ty < ty1; ty++) {
 			for (let tx = tx0; tx < tx1; tx++) {
-				const t = doc.grid[ty * MAP_SIZE + tx];
+				let t = doc.grid[ty * MAP_SIZE + tx];
 				if (t >= 10 && t <= 15) {
-					const cx = tileToScreenX(tx) + z / 2, cy = tileToScreenY(ty) + z / 2;
+					let cx = tile_to_screen_x(tx) + z / 2, cy = tile_to_screen_y(ty) + z / 2;
 					ctx.beginPath();
 					ctx.arc(cx, cy, r, 0, Math.PI * 2);
 					ctx.fill();
@@ -300,82 +300,82 @@ function draw() {
 
 	/* grid */
 	if (z >= 8) {
-		ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+		ctx.strokeStyle = "rgba(255,255,255,0.07)";
 		ctx.lineWidth = 1;
 		ctx.beginPath();
 		for (let tx = tx0; tx <= tx1; tx++) {
-			const sx = Math.round(tileToScreenX(tx)) + 0.5;
-			ctx.moveTo(sx, tileToScreenY(ty0));
-			ctx.lineTo(sx, tileToScreenY(ty1));
+			let sx = Math.round(tile_to_screen_x(tx)) + 0.5;
+			ctx.moveTo(sx, tile_to_screen_y(ty0));
+			ctx.lineTo(sx, tile_to_screen_y(ty1));
 		}
 		for (let ty = ty0; ty <= ty1; ty++) {
-			const sy = Math.round(tileToScreenY(ty)) + 0.5;
-			ctx.moveTo(tileToScreenX(tx0), sy);
-			ctx.lineTo(tileToScreenX(tx1), sy);
+			let sy = Math.round(tile_to_screen_y(ty)) + 0.5;
+			ctx.moveTo(tile_to_screen_x(tx0), sy);
+			ctx.lineTo(tile_to_screen_x(tx1), sy);
 		}
 		ctx.stroke();
 	}
 
 	/* pillbox range rings, under the object icons */
-	if (showPillRange) {
-		ctx.strokeStyle = 'rgba(255,59,48,0.3)';
+	if (show_pill_range) {
+		ctx.strokeStyle = "rgba(255,59,48,0.3)";
 		ctx.lineWidth = 1.5;
-		for (const p of doc.pills) {
+		for (let p of doc.pills) {
 			ctx.beginPath();
-			ctx.arc(tileToScreenX(p.x) + z / 2, tileToScreenY(p.y) + z / 2, PILL_RANGE * z, 0, Math.PI * 2);
+			ctx.arc(tile_to_screen_x(p.x) + z / 2, tile_to_screen_y(p.y) + z / 2, PILL_RANGE * z, 0, Math.PI * 2);
 			ctx.stroke();
 		}
 	}
 
 	/* objects */
-	const iconR = Math.max(4, z * 0.45);
-	const font = `${Math.max(8, Math.round(z * 0.6))}px sans-serif`;
-	for (const [i, b] of doc.bases.entries()) {
-		drawObject('base', i, b, iconR);
+	let icon_r = Math.max(4, z * 0.45);
+	let font = `${Math.max(8, Math.round(z * 0.6))}px sans-serif`;
+	for (let [i, b] of doc.bases.entries()) {
+		draw_object("base", i, b, icon_r);
 	}
-	for (const [i, p] of doc.pills.entries()) {
-		drawObject('pill', i, p, iconR);
+	for (let [i, p] of doc.pills.entries()) {
+		draw_object("pill", i, p, icon_r);
 	}
-	for (const [i, s] of doc.starts.entries()) {
-		drawObject('start', i, s, iconR);
+	for (let [i, s] of doc.starts.entries()) {
+		draw_object("start", i, s, icon_r);
 	}
 	/* labels in a second pass so no object can be drawn over them */
-	for (const [i, b] of doc.bases.entries()) {
-		drawObjectLabel(i, b, iconR, font);
+	for (let [i, b] of doc.bases.entries()) {
+		draw_object_label(i, b, icon_r, font);
 	}
-	for (const [i, p] of doc.pills.entries()) {
-		drawObjectLabel(i, p, iconR, font);
+	for (let [i, p] of doc.pills.entries()) {
+		draw_object_label(i, p, icon_r, font);
 	}
-	for (const [i, s] of doc.starts.entries()) {
-		drawObjectLabel(i, s, iconR, font);
+	for (let [i, s] of doc.starts.entries()) {
+		draw_object_label(i, s, icon_r, font);
 	}
 
 	/* symmetry axes / centre marker: through the middle of tile 128 for an
 	 * odd axis, on the 127|128 tile boundary for an even one */
-	if (symMode) {
-		const ax = tileToScreenX(symParity.x === 'even' ? 128 : 128.5);
-		const ay = tileToScreenY(symParity.y === 'even' ? 128 : 128.5);
-		ctx.strokeStyle = 'rgba(110,190,255,0.6)';
+	if (sym_mode) {
+		let ax = tile_to_screen_x(sym_parity.x === "even" ? 128 : 128.5);
+		let ay = tile_to_screen_y(sym_parity.y === "even" ? 128 : 128.5);
+		ctx.strokeStyle = "rgba(110,190,255,0.6)";
 		ctx.lineWidth = 1;
 		ctx.setLineDash([5, 5]);
-		if (symMode === 'h' || symMode === 'quad') {
+		if (sym_mode === "h" || sym_mode === "quad") {
 			ctx.beginPath();
 			ctx.moveTo(ax, my0);
 			ctx.lineTo(ax, my1);
 			ctx.stroke();
 		}
-		if (symMode === 'v' || symMode === 'quad') {
+		if (sym_mode === "v" || sym_mode === "quad") {
 			ctx.beginPath();
 			ctx.moveTo(mx0, ay);
 			ctx.lineTo(mx1, ay);
 			ctx.stroke();
 		}
-		if (symMode === 'rot180' || symMode === 'rot90') {
+		if (sym_mode === "rot180" || sym_mode === "rot90") {
 			ctx.beginPath();
 			ctx.arc(ax, ay, Math.max(9, z * 0.75), 0, Math.PI * 2);
 			ctx.stroke();
 			ctx.setLineDash([]);
-			ctx.fillStyle = 'rgba(110,190,255,0.6)';
+			ctx.fillStyle = "rgba(110,190,255,0.6)";
 			ctx.beginPath();
 			ctx.arc(ax, ay, 2, 0, Math.PI * 2);
 			ctx.fill();
@@ -384,23 +384,23 @@ function draw() {
 	}
 }
 
-function drawObject(type, index, o, r) {
-	const z = view.zoom;
-	const cx = tileToScreenX(o.x) + z / 2;
-	const cy = tileToScreenY(o.y) + z / 2;
-	const isSel = selected && selected.type === type && selected.index === index;
+function draw_object(type, index, o, r) {
+	let z = view.zoom;
+	let cx = tile_to_screen_x(o.x) + z / 2;
+	let cy = tile_to_screen_y(o.y) + z / 2;
+	let is_sel = selected && selected.type === type && selected.index === index;
 	ctx.lineWidth = 1.5;
-	if (type === 'pill') {
-		ctx.fillStyle = '#e33';
-		ctx.strokeStyle = '#600';
+	if (type === "pill") {
+		ctx.fillStyle = "#e33";
+		ctx.strokeStyle = "#600";
 		ctx.beginPath();
 		ctx.arc(cx, cy, r, 0, Math.PI * 2);
 		ctx.fill();
 		ctx.stroke();
-	} else if (type === 'base') {
-		ctx.fillStyle = '#f0b429';
-		ctx.strokeStyle = '#7a5200';
-		if (basesAsCircles) {
+	} else if (type === "base") {
+		ctx.fillStyle = "#f0b429";
+		ctx.strokeStyle = "#7a5200";
+		if (bases_as_circles) {
 			ctx.beginPath();
 			ctx.arc(cx, cy, r, 0, Math.PI * 2);
 			ctx.fill();
@@ -410,11 +410,11 @@ function drawObject(type, index, o, r) {
 			ctx.strokeRect(cx - r, cy - r, r * 2, r * 2);
 		}
 	} else {
-		ctx.fillStyle = '#fff';
-		ctx.strokeStyle = '#333';
+		ctx.fillStyle = "#fff";
+		ctx.strokeStyle = "#333";
 		/* File format: 0 = east, counter-clockwise (startsConvertDir in starts.c).
 		 * Canvas rotation is clockwise-from-north, so mirror: (4 - dir) mod 16. */
-		const ang = (((4 - o.dir) & 15) / 16) * Math.PI * 2;
+		let ang = (((4 - o.dir) & 15) / 16) * Math.PI * 2;
 		ctx.save();
 		ctx.translate(cx, cy);
 		ctx.rotate(ang);
@@ -427,87 +427,87 @@ function drawObject(type, index, o, r) {
 		ctx.stroke();
 		ctx.restore();
 	}
-	if (isSel) {
-		ctx.strokeStyle = '#fff';
+	if (is_sel) {
+		ctx.strokeStyle = "#fff";
 		ctx.lineWidth = 2;
 		ctx.strokeRect(cx - r - 3, cy - r - 3, (r + 3) * 2, (r + 3) * 2);
 	}
 }
 
-function drawObjectLabel(index, o, r, font) {
+function draw_object_label(index, o, r, font) {
 	if (view.zoom < 10) return;
-	const z = view.zoom;
-	const cx = tileToScreenX(o.x) + z / 2;
-	const cy = tileToScreenY(o.y) + z / 2;
-	ctx.fillStyle = '#fff';
+	let z = view.zoom;
+	let cx = tile_to_screen_x(o.x) + z / 2;
+	let cy = tile_to_screen_y(o.y) + z / 2;
+	ctx.fillStyle = "#fff";
 	ctx.font = font;
-	ctx.textAlign = 'center';
+	ctx.textAlign = "center";
 	ctx.fillText(String(index + 1), cx, cy - r - 3);
 }
 
 /* ---------- editing ---------- */
-function setCell(x, y, t) {
-	if (!inRegion(x, y)) return false;
+function set_cell(x, y, t) {
+	if (!in_region(x, y)) return false;
 	/* spawn points must sit on deep sea */
-	if (t !== DEEP_SEA && objectAt('start', x, y) >= 0) return false;
-	const i = y * MAP_SIZE + x;
+	if (t !== DEEP_SEA && object_at("start", x, y) >= 0) return false;
+	let i = y * MAP_SIZE + x;
 	if (doc.grid[i] === t) return false;
 	doc.grid[i] = t;
-	updateOffPixel(x, y);
+	update_off_pixel(x, y);
 	return true;
 }
 
-/* setCell across the whole symmetry orbit of (x,y). Off-region images are
- * rejected by setCell like any other cell (and with symmetry on, an image
+/* set_cell across the whole symmetry orbit of (x,y). Off-region images are
+ * rejected by set_cell like any other cell (and with symmetry on, an image
  * of an in-region cell is always in-region: the saved region maps onto
  * itself under every mode). */
-function setCellSym(x, y, t) {
+function set_cell_sym(x, y, t) {
 	let changed = false;
-	for (const m of symOrbit(x, y)) changed = setCell(m.x, m.y, t) || changed;
+	for (let m of sym_orbit(x, y)) changed = set_cell(m.x, m.y, t) || changed;
 	return changed;
 }
 
-function paintBrush(x, y, t) {
-	const o = Math.floor((brushSize - 1) / 2);
+function paint_brush(x, y, t) {
+	let o = Math.floor((brush_size - 1) / 2);
 	let changed = false;
-	for (let dy = 0; dy < brushSize; dy++) {
-		for (let dx = 0; dx < brushSize; dx++) {
-			changed = setCellSym(x - o + dx, y - o + dy, t) || changed;
+	for (let dy = 0; dy < brush_size; dy++) {
+		for (let dx = 0; dx < brush_size; dx++) {
+			changed = set_cell_sym(x - o + dx, y - o + dy, t) || changed;
 		}
 	}
 	return changed;
 }
 
-function paintLine(x0, y0, x1, y1, t) {
-	const dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
-	const sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+function paint_line(x0, y0, x1, y1, t) {
+	let dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
+	let sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
 	let err = dx - dy, changed = false;
 	for (;;) {
-		changed = paintBrush(x0, y0, t) || changed;
+		changed = paint_brush(x0, y0, t) || changed;
 		if (x0 === x1 && y0 === y1) break;
-		const e2 = 2 * err;
+		let e2 = 2 * err;
 		if (e2 > -dy) { err -= dy; x0 += sx; }
 		if (e2 < dx) { err += dx; y0 += sy; }
 	}
 	return changed;
 }
 
-function floodFill(x, y, t) {
-	if (!inRegion(x, y)) return false;
-	const target = doc.grid[y * MAP_SIZE + x];
+function flood_fill(x, y, t) {
+	if (!in_region(x, y)) return false;
+	let target = doc.grid[y * MAP_SIZE + x];
 	if (target === t) return false;
-	const stack = [[x, y]];
-	const visited = new Uint8Array(MAP_SIZE * MAP_SIZE);
-	const filled = [];
+	let stack = [[x, y]];
+	let visited = new Uint8Array(MAP_SIZE * MAP_SIZE);
+	let filled = [];
 	let changed = false;
 	while (stack.length) {
-		const [cx, cy] = stack.pop();
-		if (!inRegion(cx, cy)) continue;
-		const i = cy * MAP_SIZE + cx;
+		let [cx, cy] = stack.pop();
+		if (!in_region(cx, cy)) continue;
+		let i = cy * MAP_SIZE + cx;
 		if (visited[i] || doc.grid[i] !== target) continue;
 		visited[i] = 1;
 		/* fill flows past spawn points but leaves their deep sea untouched */
-		if (t === DEEP_SEA || objectAt('start', cx, cy) < 0) {
+		if (t === DEEP_SEA || object_at("start", cx, cy) < 0) {
 			doc.grid[i] = t;
 			filled.push(i);
 			changed = true;
@@ -516,115 +516,115 @@ function floodFill(x, y, t) {
 	}
 	/* Replicate to the symmetry images only after the traversal: painting
 	 * them mid-flood would cut off a fill region that straddles an axis.
-	 * Direct grid writes (setCell's rules, minus the per-pixel offscreen
+	 * Direct grid writes (set_cell's rules, minus the per-pixel offscreen
 	 * update) keep giant fills from doing thousands of 1px blits. */
-	if (symMode) {
-		for (const i of filled) {
-			for (const m of symOrbit(i & 0xff, i >> 8)) {
-				if (!inRegion(m.x, m.y)) continue;
-				if (t !== DEEP_SEA && objectAt('start', m.x, m.y) >= 0) continue;
-				const j = m.y * MAP_SIZE + m.x;
+	if (sym_mode) {
+		for (let i of filled) {
+			for (let m of sym_orbit(i & 0xff, i >> 8)) {
+				if (!in_region(m.x, m.y)) continue;
+				if (t !== DEEP_SEA && object_at("start", m.x, m.y) >= 0) continue;
+				let j = m.y * MAP_SIZE + m.x;
 				if (doc.grid[j] !== t) { doc.grid[j] = t; changed = true; }
 			}
 		}
 	}
-	if (changed) rebuildOffscreen();
+	if (changed) rebuild_offscreen();
 	return changed;
 }
 
 /* Direction (file convention: 0=E, counter-clockwise, 16 steps) from (x,y)
  * toward the centre of mass of land; empty map falls back to map centre. */
-function spawnDirToward(x, y) {
+function spawn_dir_toward(x, y) {
 	let sx = 0, sy = 0, n = 0;
 	for (let ty = 0; ty < MAP_SIZE; ty++) {
 		for (let tx = 0; tx < MAP_SIZE; tx++) {
 			if (doc.grid[ty * MAP_SIZE + tx] !== DEEP_SEA) { sx += tx; sy += ty; n++; }
 		}
 	}
-	const cx = n ? sx / n : 128, cy = n ? sy / n : 128;
+	let cx = n ? sx / n : 128, cy = n ? sy / n : 128;
 	/* map y grows southward, so negate dy for a 0=east counter-clockwise angle */
-	const ang = Math.atan2(-(cy - y), cx - x);
+	let ang = Math.atan2(-(cy - y), cx - x);
 	return ((Math.round(ang / (Math.PI / 8)) % 16) + 16) % 16;
 }
 
-function objectAt(type, x, y) {
+function object_at(type, x, y) {
 	return doc[OBJECT_LIST[type]].findIndex(o => o.x === x && o.y === y);
 }
 
 /* First object of any type on this tile, as {type, index}, else null. */
-function objectAtAnyType(x, y) {
-	for (const type of Object.keys(OBJECT_LIST)) {
-		const index = objectAt(type, x, y);
+function object_at_any_type(x, y) {
+	for (let type of Object.keys(OBJECT_LIST)) {
+		let index = object_at(type, x, y);
 		if (index >= 0) return { type, index };
 	}
 	return null;
 }
 
-function deleteSelected() {
+function delete_selected() {
 	if (!selected) return;
-	endGesture(); /* a live drag would hold a stale index after the filter */
-	const { type } = selected;
-	const listName = OBJECT_LIST[type];
-	const list = doc[listName];
-	const o = list[selected.index];
+	end_gesture(); /* a live drag would hold a stale index after the filter */
+	let { type } = selected;
+	let list_name = OBJECT_LIST[type];
+	let list = doc[list_name];
+	let o = list[selected.index];
 	if (!o) { selected = null; return; }
-	pushUndo();
+	push_undo();
 	/* Symmetry: any same-type objects on the mirror tiles go too. Tolerant
 	 * by design — mirrors that don't exist (or were moved off their tile)
 	 * are simply skipped, so this also works on hand-edited layouts. */
-	const doomed = new Set([selected.index]);
-	for (const m of symOrbit(o.x, o.y).slice(1)) {
-		const idx = objectAt(type, m.x, m.y);
+	let doomed = new Set([selected.index]);
+	for (let m of sym_orbit(o.x, o.y).slice(1)) {
+		let idx = object_at(type, m.x, m.y);
 		if (idx >= 0) doomed.add(idx);
 	}
-	doc[listName] = list.filter((_, i) => !doomed.has(i));
+	doc[list_name] = list.filter((_, i) => !doomed.has(i));
 	selected = null;
-	setDirty(true);
-	updateCounts();
-	renderProps();
-	requestDraw();
+	set_dirty(true);
+	update_counts();
+	render_props();
+	request_draw();
 	if (doomed.size > 1) {
-		statusMsg(`deleted ${doomed.size} mirrored ${OBJECT_LABEL_PLURAL[type]}`);
+		status_msg(`deleted ${doomed.size} mirrored ${OBJECT_LABEL_PLURAL[type]}`);
 	}
 }
 
 /* Is any object (of any type) on this tile, other than the excluded one? */
-function tileOccupied(x, y, exclType, exclIndex) {
-	for (const type of Object.keys(OBJECT_LIST)) {
-		const idx = objectAt(type, x, y);
-		if (idx >= 0 && !(type === exclType && idx === exclIndex)) return true;
+function tile_occupied(x, y, excl_type, excl_index) {
+	for (let type of Object.keys(OBJECT_LIST)) {
+		let idx = object_at(type, x, y);
+		if (idx >= 0 && !(type === excl_type && idx === excl_index)) return true;
 	}
 	return false;
 }
 
 /* ---------- symmetry ---------- */
-function symOrbit(x, y) {
-	return BoloSym.orbit(symMode, symParity, x, y);
+function sym_orbit(x, y) {
+	return BoloSym.orbit(sym_mode, sym_parity, x, y);
 }
 
 /* Best-effort recentring when symmetry is switched on: shift everything
  * so the content straddles the centre cell (128,128). Bounds come from
- * BoloSym.contentBox — terrain, pills and bases, but NOT spawns — so the
+ * BoloSym.content_box — terrain, pills and bases, but NOT spawns — so the
  * axes land exactly where load-time detection would put them; symmetry
  * never looks at spawns, and they must not get a vote on the axes
  * either. Content inside the saved region stays inside it (the centred
  * box can't overhang, because the region itself is centred on 128).
  * The caller owns the undo entry — its snapshot must be taken before
  * the mode/parity change that led here. */
-function centreContent(boundsOverride) {
-	const b = boundsOverride || BoloSym.contentBox(doc);
+function centre_content(bounds_override) {
+	let b = bounds_override || BoloSym.content_box(doc);
 	if (!b) return false;
-	const { dx, dy } = BoloSym.centreShift(b, symParity);
+	let { dx, dy } = BoloSym.centre_shift(b, sym_parity);
 	if (!dx && !dy) return false;
-	const ng = new Uint8Array(MAP_SIZE * MAP_SIZE);
+	let ng = new Uint8Array(MAP_SIZE * MAP_SIZE);
 	ng.fill(DEEP_SEA);
 	for (let y = 0; y < MAP_SIZE; y++) {
-		const ny = y + dy;
+		let ny = y + dy;
 		if (ny < 0 || ny >= MAP_SIZE) continue;
 		for (let x = 0; x < MAP_SIZE; x++) {
-			const v = doc.grid[y * MAP_SIZE + x];
+			let v = doc.grid[y * MAP_SIZE + x];
 			if (v === DEEP_SEA) continue;
-			const nx = x + dx;
+			let nx = x + dx;
 			if (nx >= 0 && nx < MAP_SIZE) ng[ny * MAP_SIZE + nx] = v;
 		}
 	}
@@ -635,76 +635,76 @@ function centreContent(boundsOverride) {
 	 * well-formed map only spawns are exposed — they are excluded from
 	 * the symmetry bounds, so a fringe spawn can fall off the edge when
 	 * the map shifts. The caller's undo entry restores them. */
-	const dropped = { starts: 0, others: 0 };
-	const selObj = selected ? doc[OBJECT_LIST[selected.type]][selected.index] : null;
-	for (const [type, listName] of Object.entries(OBJECT_LIST)) {
-		const kept = [];
-		for (const o of doc[listName]) {
-			if (inRegion(o.x + dx, o.y + dy)) {
+	let dropped = { starts: 0, others: 0 };
+	let sel_obj = selected ? doc[OBJECT_LIST[selected.type]][selected.index] : null;
+	for (let [type, list_name] of Object.entries(OBJECT_LIST)) {
+		let kept = [];
+		for (let o of doc[list_name]) {
+			if (in_region(o.x + dx, o.y + dy)) {
 				o.x += dx;
 				o.y += dy;
 				kept.push(o);
 			} else {
-				dropped[type === 'start' ? 'starts' : 'others']++;
+				dropped[type === "start" ? "starts" : "others"]++;
 			}
 		}
-		doc[listName] = kept;
+		doc[list_name] = kept;
 	}
-	if (selObj) {
-		const idx = doc[OBJECT_LIST[selected.type]].indexOf(selObj);
+	if (sel_obj) {
+		let idx = doc[OBJECT_LIST[selected.type]].indexOf(sel_obj);
 		selected = idx >= 0 ? { type: selected.type, index: idx } : null;
 	}
-	rebuildOffscreen();
-	setDirty(true);
-	renderProps();
-	refreshHoverStatus();
-	updateCounts();
+	rebuild_offscreen();
+	set_dirty(true);
+	render_props();
+	refresh_hover_status();
+	update_counts();
 	return { dropped };
 }
 
-/* Status-message suffix for a centreContent result. */
-function recentreNote(moved) {
-	if (!moved) return '';
-	let note = ' — map recentred';
-	const bits = [];
+/* Status-message suffix for a centre_content result. */
+function recentre_note(moved) {
+	if (!moved) return "";
+	let note = " — map recentred";
+	let bits = [];
 	if (moved.dropped.starts) {
-		bits.push(`${moved.dropped.starts} spawn${moved.dropped.starts === 1 ? '' : 's'}`);
+		bits.push(`${moved.dropped.starts} spawn${moved.dropped.starts === 1 ? "" : "s"}`);
 	}
 	if (moved.dropped.others) {
-		bits.push(`${moved.dropped.others} other object${moved.dropped.others === 1 ? '' : 's'}`);
+		bits.push(`${moved.dropped.others} other object${moved.dropped.others === 1 ? "" : "s"}`);
 	}
-	if (bits.length) note += `, ${bits.join(' and ')} dropped off the edge`;
+	if (bits.length) note += `, ${bits.join(" and ")} dropped off the edge`;
 	return note;
 }
 
-function updateSymUI() {
-	document.querySelectorAll('button.sym').forEach(b =>
-		b.classList.toggle('active', b.dataset.sym === (symMode || 'off')));
-	document.querySelectorAll('button.sympar').forEach(b => {
-		b.disabled = !symMode;
-		b.classList.toggle('active', !!symMode &&
-			symParity.x === b.dataset.parity && symParity.y === b.dataset.parity);
+function update_sym_ui() {
+	document.querySelectorAll("button.sym").forEach(b =>
+		b.classList.toggle("active", b.dataset.sym === (sym_mode || "off")));
+	document.querySelectorAll("button.sympar").forEach(b => {
+		b.disabled = !sym_mode;
+		b.classList.toggle("active", !!sym_mode &&
+			sym_parity.x === b.dataset.parity && sym_parity.y === b.dataset.parity);
 	});
-	const parityNote = symParity.x === symParity.y
-		? symParity.x
-		: `${symParity.x} x, ${symParity.y} y`;
-	statusSym.textContent = symMode
-		? `symmetry: ${BoloSym.MODES[symMode].label} (${parityNote} axis)`
-		: '';
+	let parity_note = sym_parity.x === sym_parity.y
+		? sym_parity.x
+		: `${sym_parity.x} x, ${sym_parity.y} y`;
+	status_sym.textContent = sym_mode
+		? `symmetry: ${BoloSym.MODES[sym_mode].label} (${parity_note} axis)`
+		: "";
 }
 
 /* Same-type objects sitting on the grabbed object's mirror tiles at
  * gesture start, each remembering its transform so it can follow the
  * primary. Matched by position only — nothing is paired persistently,
  * so hand-edited layouts just yield fewer (or no) followers. */
-function captureDragMirrors(type, index) {
-	const o = doc[OBJECT_LIST[type]][index];
-	const tf = BoloSym.transforms(symMode, symParity);
-	const mirrors = [];
-	const taken = new Set([index]);
+function capture_drag_mirrors(type, index) {
+	let o = doc[OBJECT_LIST[type]][index];
+	let tf = BoloSym.transforms(sym_mode, sym_parity);
+	let mirrors = [];
+	let taken = new Set([index]);
 	for (let k = 1; k < tf.length; k++) {
-		const [mx, my] = tf[k].pos(o.x, o.y);
-		const idx = objectAt(type, mx, my);
+		let [mx, my] = tf[k].pos(o.x, o.y);
+		let idx = object_at(type, mx, my);
 		if (idx >= 0 && !taken.has(idx)) {
 			taken.add(idx);
 			mirrors.push({ index: idx, k });
@@ -718,67 +718,67 @@ function captureDragMirrors(type, index) {
  * rules — a mirror whose destination is blocked simply stays behind.
  * Deliberately no cleverness: dragging the primary onto one of its own
  * mirrors is an ordinary "tile occupied" refusal, not a swap. */
-function dragObjectTo(tx, ty) {
-	if (!objDrag) return false;
-	const list = doc[OBJECT_LIST[objDrag.type]];
-	const o = list[objDrag.index];
-	const nx = clampRegion(tx), ny = clampRegion(ty);
-	if (objDrag.type === 'start' && doc.grid[ny * MAP_SIZE + nx] !== DEEP_SEA) {
-		statusMsg('spawn points must be on deep sea');
+function drag_object_to(tx, ty) {
+	if (!obj_drag) return false;
+	let list = doc[OBJECT_LIST[obj_drag.type]];
+	let o = list[obj_drag.index];
+	let nx = clamp_region(tx), ny = clamp_region(ty);
+	if (obj_drag.type === "start" && doc.grid[ny * MAP_SIZE + nx] !== DEEP_SEA) {
+		status_msg("spawn points must be on deep sea");
 		return false;
 	}
-	if (tileOccupied(nx, ny, objDrag.type, objDrag.index)) {
-		statusMsg('tile already occupied by another object');
+	if (tile_occupied(nx, ny, obj_drag.type, obj_drag.index)) {
+		status_msg("tile already occupied by another object");
 		return false;
 	}
 	if (!o || (o.x === nx && o.y === ny)) return false;
-	if (!objDrag.undoPushed) { pushUndo(); objDrag.undoPushed = true; }
+	if (!obj_drag.undo_pushed) { push_undo(); obj_drag.undo_pushed = true; }
 	o.x = nx; o.y = ny;
-	const tf = BoloSym.transforms(symMode, symParity);
-	for (const m of objDrag.mirrors || []) {
-		const mo = list[m.index];
+	let tf = BoloSym.transforms(sym_mode, sym_parity);
+	for (let m of obj_drag.mirrors || []) {
+		let mo = list[m.index];
 		if (!mo || !tf[m.k]) continue;
-		const [mx, my] = tf[m.k].pos(nx, ny);
-		if (!inRegion(mx, my)) continue; /* even-axis far edge has no image */
-		if (objDrag.type === 'start' && doc.grid[my * MAP_SIZE + mx] !== DEEP_SEA) continue;
-		if (tileOccupied(mx, my, objDrag.type, m.index)) continue;
+		let [mx, my] = tf[m.k].pos(nx, ny);
+		if (!in_region(mx, my)) continue; /* even-axis far edge has no image */
+		if (obj_drag.type === "start" && doc.grid[my * MAP_SIZE + mx] !== DEEP_SEA) continue;
+		if (tile_occupied(mx, my, obj_drag.type, m.index)) continue;
 		mo.x = mx; mo.y = my;
 	}
-	setDirty(true);
-	renderProps();
-	requestDraw();
+	set_dirty(true);
+	render_props();
+	request_draw();
 	return true;
 }
 
-function setSymmetry(mode, quiet) {
-	if (mode === symMode) return;
-	const snap = snapshot(); /* pre-change, in case entering recentres */
-	symMode = mode;
+function set_symmetry(mode, quiet) {
+	if (mode === sym_mode) return;
+	let snap = snapshot(); /* pre-change, in case entering recentres */
+	sym_mode = mode;
 	if (mode) {
 		/* Every mode click re-derives the axis parity from the content and
 		 * recentres, exactly as if entering from off — a manual odd/even
 		 * override only lasts for the mode it was made in. Spawn-blind
 		 * bounds, so this always agrees with load-time detection. */
-		const b = BoloSym.contentBox(doc);
-		symParity = b ? BoloSym.autoParity(b) : { x: 'odd', y: 'odd' };
+		let b = BoloSym.content_box(doc);
+		sym_parity = b ? BoloSym.auto_parity(b) : { x: "odd", y: "odd" };
 		/* a quarter-turn has a single centre: both axes must share a parity */
-		if (mode === 'rot90' && symParity.x !== symParity.y) {
-			symParity = { x: symParity.x, y: symParity.x };
+		if (mode === "rot90" && sym_parity.x !== sym_parity.y) {
+			sym_parity = { x: sym_parity.x, y: sym_parity.x };
 		}
-		updateSymUI();
-		const moved = centreContent();
-		if (moved) pushUndoEntry(snap);
+		update_sym_ui();
+		let moved = centre_content();
+		if (moved) push_undo_entry(snap);
 		if (!quiet) {
-			const note = symParity.x === symParity.y
-				? `${symParity.x} axis`
-				: `mixed axis (${symParity.x} x, ${symParity.y} y)`;
-			statusMsg(`symmetry on: ${BoloSym.MODES[mode].label}, ${note}${recentreNote(moved)}`);
+			let note = sym_parity.x === sym_parity.y
+				? `${sym_parity.x} axis`
+				: `mixed axis (${sym_parity.x} x, ${sym_parity.y} y)`;
+			status_msg(`symmetry on: ${BoloSym.MODES[mode].label}, ${note}${recentre_note(moved)}`);
 		}
 	} else {
-		updateSymUI();
-		if (!quiet) statusMsg('symmetry off');
+		update_sym_ui();
+		if (!quiet) status_msg("symmetry off");
 	}
-	requestDraw();
+	request_draw();
 }
 
 /* On load: if the map is already perfectly symmetric (spawns and the
@@ -786,127 +786,127 @@ function setSymmetry(mode, quiet) {
  * own axes may sit anywhere; recentring moves them onto the board's
  * standard axes — as one undoable step, only when a shift is needed,
  * so an already-centred file loads clean. */
-function autoDetectSymmetry() {
-	const found = BoloSym.detect(doc);
+function auto_detect_symmetry() {
+	let found = BoloSym.detect(doc);
 	if (!found) return;
-	const snap = snapshot(); /* pre-change: symmetry still off here */
-	symMode = found.mode;
-	symParity = found.parity;
-	updateSymUI();
-	const moved = centreContent(found.bounds);
-	if (moved) pushUndoEntry(snap);
-	const except = found.spawnsSymmetric ? '' : ' (except spawns)';
-	statusMsg(`this map is ${BoloSym.MODES[found.mode].label} symmetric${except} — symmetry mode on${recentreNote(moved)}`, 4000);
-	requestDraw();
+	let snap = snapshot(); /* pre-change: symmetry still off here */
+	sym_mode = found.mode;
+	sym_parity = found.parity;
+	update_sym_ui();
+	let moved = centre_content(found.bounds);
+	if (moved) push_undo_entry(snap);
+	let except = found.spawns_symmetric ? "" : " (except spawns)";
+	status_msg(`this map is ${BoloSym.MODES[found.mode].label} symmetric${except} — symmetry mode on${recentre_note(moved)}`, 4000);
+	request_draw();
 }
 
 /* On demand: how far is this map from perfect symmetry? Reports the
  * minimum-edit count for the best mode, plus every mode's own score. */
-function cmdSymmetryScore() {
-	const s = BoloSym.score(doc);
+function cmd_symmetry_score() {
+	let s = BoloSym.score(doc);
 	if (!s) {
-		statusMsg('empty map — nothing to score');
+		status_msg("empty map — nothing to score");
 		return;
 	}
-	const label = m => BoloSym.MODES[m].label;
-	const parts = Object.keys(BoloSym.MODES).map(m => `${label(m)} ${s.perMode[m]}`).join(' · ');
-	const except = s.spawnsSymmetric ? '' : ' (except spawns)';
-	const head = s.flaws === 0
+	let label = m => BoloSym.MODES[m].label;
+	let parts = Object.keys(BoloSym.MODES).map(m => `${label(m)} ${s.per_mode[m]}`).join(" · ");
+	let except = s.spawns_symmetric ? "" : " (except spawns)";
+	let head = s.flaws === 0
 		? `symmetry flaws: 0 — perfectly ${label(s.mode)} symmetric${except}`
 		: `symmetry flaws: ${s.flaws} (closest: ${label(s.mode)})`;
-	statusMsg(`${head} — ${parts}`, 6000);
+	status_msg(`${head} — ${parts}`, 6000);
 }
 
 /* On demand: locate one concrete flaw — a tile the best mode would
  * edit — and name it in the status bar. */
-function cmdFindFlaw() {
-	const s = BoloSym.findFlaw(doc);
+function cmd_find_flaw() {
+	let s = BoloSym.find_flaw(doc);
 	if (!s) {
-		statusMsg('empty map — nothing to check');
+		status_msg("empty map — nothing to check");
 		return;
 	}
-	const label = BoloSym.MODES[s.mode].label;
+	let label = BoloSym.MODES[s.mode].label;
 	if (s.flaws === 0) {
-		const except = s.spawnsSymmetric ? '' : ' (except spawns)';
-		statusMsg(`no flaws — perfectly ${label} symmetric${except}`, 5000);
+		let except = s.spawns_symmetric ? "" : " (except spawns)";
+		status_msg(`no flaws — perfectly ${label} symmetric${except}`, 5000);
 		return;
 	}
 	if (!s.flaw) {
-		statusMsg(`${s.flaws} flaw${s.flaws === 1 ? '' : 's'} counted but none located — please report this`, 6000);
+		status_msg(`${s.flaws} flaw${s.flaws === 1 ? "" : "s"} counted but none located — please report this`, 6000);
 		return;
 	}
-	const f = s.flaw;
-	const noun = { terrain: 'terrain', pill: 'pillbox', base: 'base' }[f.kind];
-	const what = f.kind === 'terrain'
-		? 'terrain differs from its mirror image'
+	let f = s.flaw;
+	let noun = { terrain: "terrain", pill: "pillbox", base: "base" }[f.kind];
+	let what = f.kind === "terrain"
+		? "terrain differs from its mirror image"
 		: (f.missing ? `${noun} missing here` : `${noun} with no mirror image`);
-	statusMsg(`asymmetric tile (${f.x}, ${f.y}): ${what} — judging as ${label}`, 6000);
+	status_msg(`asymmetric tile (${f.x}, ${f.y}): ${what} — judging as ${label}`, 6000);
 }
 
 /* On demand: report every pillbox speed value in use. */
-function cmdPillSpeeds() {
+function cmd_pill_speeds() {
 	if (doc.pills.length === 0) {
-		statusMsg('no pillboxes on the map');
+		status_msg("no pillboxes on the map");
 		return;
 	}
-	const counts = new Map();
-	for (const p of doc.pills) counts.set(p.speed, (counts.get(p.speed) || 0) + 1);
+	let counts = new Map();
+	for (let p of doc.pills) counts.set(p.speed, (counts.get(p.speed) || 0) + 1);
 	if (counts.size === 1) {
-		const [speed] = counts.keys();
-		statusMsg(`all ${doc.pills.length} pillboxes have speed ${speed}`, 5000);
+		let [speed] = counts.keys();
+		status_msg(`all ${doc.pills.length} pillboxes have speed ${speed}`, 5000);
 		return;
 	}
-	const parts = [...counts.entries()]
+	let parts = [...counts.entries()]
 		.sort(([va, ca], [vb, cb]) => cb - ca || vb - va)
 		.map(([v, c]) => `${v} (${c})`)
-		.join(', ');
-	statusMsg(`speeds: ${parts}`, 6000);
+		.join(", ");
+	status_msg(`speeds: ${parts}`, 6000);
 }
 
 /* Manual axis-parity override (sets both axes; recentres to match). */
-function setParity(p) {
-	if (!symMode) return;
-	if (symParity.x === p && symParity.y === p) return;
-	const snap = snapshot(); /* pre-change, in case the new axis recentres */
-	symParity = { x: p, y: p };
-	updateSymUI();
-	const moved = centreContent();
-	if (moved) pushUndoEntry(snap);
-	statusMsg(`symmetry axis: ${p === 'odd' ? 'through tile 128' : 'between tiles 127 and 128'}${recentreNote(moved)}`);
-	requestDraw();
+function set_parity(p) {
+	if (!sym_mode) return;
+	if (sym_parity.x === p && sym_parity.y === p) return;
+	let snap = snapshot(); /* pre-change, in case the new axis recentres */
+	sym_parity = { x: p, y: p };
+	update_sym_ui();
+	let moved = centre_content();
+	if (moved) push_undo_entry(snap);
+	status_msg(`symmetry axis: ${p === "odd" ? "through tile 128" : "between tiles 127 and 128"}${recentre_note(moved)}`);
+	request_draw();
 }
 
 /* ---------- properties panel ---------- */
-function renderProps() {
-	propsEl.textContent = '';
+function render_props() {
+	props_el.textContent = "";
 	if (!selected) {
-		const hint = document.createElement('span');
-		hint.className = 'hint';
-		const b = document.createElement('b');
-		b.textContent = 'Right-click';
+		let hint = document.createElement("span");
+		hint.className = "hint";
+		let b = document.createElement("b");
+		b.textContent = "Right-click";
 		hint.appendChild(b);
-		hint.appendChild(document.createTextNode(' an object to select or drag it.'));
-		propsEl.appendChild(hint);
+		hint.appendChild(document.createTextNode(" an object to select or drag it."));
+		props_el.appendChild(hint);
 		return;
 	}
-	const list = doc[OBJECT_LIST[selected.type]];
-	const o = list[selected.index];
-	if (!o) { selected = null; return renderProps(); }
+	let list = doc[OBJECT_LIST[selected.type]];
+	let o = list[selected.index];
+	if (!o) { selected = null; return render_props(); }
 
-	const h = document.createElement('h3');
+	let h = document.createElement("h3");
 	h.textContent = `${OBJECT_LABEL[selected.type]} #${selected.index + 1} at (${o.x}, ${o.y})`;
-	propsEl.appendChild(h);
+	props_el.appendChild(h);
 
-	if (selected.type === 'pill' || selected.type === 'base') {
-		const row = document.createElement('div');
-		row.className = 'row';
-		const label = document.createElement('span');
-		label.textContent = 'terrain under';
-		const val = document.createElement('span');
+	if (selected.type === "pill" || selected.type === "base") {
+		let row = document.createElement("div");
+		row.className = "row";
+		let label = document.createElement("span");
+		label.textContent = "terrain under";
+		let val = document.createElement("span");
 		val.textContent = TERRAIN_NAMES[doc.grid[o.y * MAP_SIZE + o.x]];
 		row.appendChild(label);
 		row.appendChild(val);
-		propsEl.appendChild(row);
+		props_el.appendChild(row);
 	}
 
 	/* Dormant: pill/base stat editors. We deliberately don't expose these
@@ -914,149 +914,149 @@ function renderProps() {
 	 * and the reset fixes in the menu normalize them on request. Only the
 	 * spawn's dir stays editable. To revive, iterate
 	 * OBJECT_FIELDS[selected.type] unconditionally. */
-	const fields = selected.type === 'start' ? OBJECT_FIELDS[selected.type] : [];
-	for (const [field, min, max] of fields) {
-		const row = document.createElement('label');
-		row.className = 'row';
-		const span = document.createElement('span');
-		span.textContent = field === 'owner' ? 'owner (255=neutral)'
-										 : field === 'dir' ? 'dir (0=E, counter-cw)'
+	let fields = selected.type === "start" ? OBJECT_FIELDS[selected.type] : [];
+	for (let [field, min, max] of fields) {
+		let row = document.createElement("label");
+		row.className = "row";
+		let span = document.createElement("span");
+		span.textContent = field === "owner" ? "owner (255=neutral)"
+										 : field === "dir" ? "dir (0=E, counter-cw)"
 										 : field;
-		const input = document.createElement('input');
-		input.type = 'number';
+		let input = document.createElement("input");
+		input.type = "number";
 		input.min = min; input.max = max; input.value = o[field];
-		input.addEventListener('change', () => {
+		input.addEventListener("change", () => {
 			let v = Math.round(Number(input.value));
 			if (!Number.isFinite(v)) v = o[field];
 			v = Math.max(min, Math.min(max, v));
 			input.value = v;
 			/* Symmetry: a committed direction carries to the spawns on the mirror
 			 * tiles, each turned by its own transform. Tolerant like
-			 * deleteSelected — mirrors that don't exist (or were moved off their
+			 * delete_selected — mirrors that don't exist (or were moved off their
 			 * tile) are simply skipped. Only pairs that actually change are
 			 * collected, so a re-commit of the same value stays a no-op while a
 			 * commit that only fixes stale mirrors still counts as an edit. */
-			const mirrors = [];
-			if (selected.type === 'start' && field === 'dir') {
-				for (const m of symOrbit(o.x, o.y).slice(1)) {
-					const idx = objectAt('start', m.x, m.y);
+			let mirrors = [];
+			if (selected.type === "start" && field === "dir") {
+				for (let m of sym_orbit(o.x, o.y).slice(1)) {
+					let idx = object_at("start", m.x, m.y);
 					if (idx < 0 || idx === selected.index) continue;
-					const mo = doc.starts[idx];
-					const md = m.dir(v);
+					let mo = doc.starts[idx];
+					let md = m.dir(v);
 					if (mo.dir !== md) mirrors.push({ o: mo, dir: md });
 				}
 			}
 			if (o[field] === v && !mirrors.length) return;
-			pushUndo();
+			push_undo();
 			o[field] = v;
-			for (const m of mirrors) m.o.dir = m.dir;
-			setDirty(true);
-			requestDraw();
+			for (let m of mirrors) m.o.dir = m.dir;
+			set_dirty(true);
+			request_draw();
 			if (mirrors.length) {
-				statusMsg(`direction mirrored to ${mirrors.length} spawn point${mirrors.length === 1 ? '' : 's'}`);
+				status_msg(`direction mirrored to ${mirrors.length} spawn point${mirrors.length === 1 ? "" : "s"}`);
 			}
 		});
 		row.appendChild(span);
 		row.appendChild(input);
-		propsEl.appendChild(row);
+		props_el.appendChild(row);
 	}
 
-	const del = document.createElement('button');
-	del.textContent = 'Delete';
-	del.addEventListener('click', deleteSelected);
-	propsEl.appendChild(del);
+	let del = document.createElement("button");
+	del.textContent = "Delete";
+	del.addEventListener("click", delete_selected);
+	props_el.appendChild(del);
 }
 
 /* ---------- palette / tools UI ---------- */
-function buildPalette() {
-	const pal = document.getElementById('palette');
-	const order = [7, 5, 4, 2, 0, 8, 6, 3, 9, 1, 255, null,
+function build_palette() {
+	let pal = document.getElementById("palette");
+	let order = [7, 5, 4, 2, 0, 8, 6, 3, 9, 1, 255, null,
 								 15, 13, 12, 10, null, null, 14, 11];
 								 /* nulls: mined building / mined shot building don't exist */
-	for (const t of order) {
+	for (let t of order) {
 		if (t === null) { /* spacer separating regular and mined terrain */
-			const gap = document.createElement('div');
-			gap.className = 'swatch blank';
+			let gap = document.createElement("div");
+			gap.className = "swatch blank";
 			pal.appendChild(gap);
 			continue;
 		}
-		const sw = document.createElement('div');
-		sw.className = 'swatch' + (t === terrain ? ' active' : '');
-		const [r, g, b] = RGB[t];
+		let sw = document.createElement("div");
+		sw.className = "swatch" + (t === terrain ? " active" : "");
+		let [r, g, b] = RGB[t];
 		sw.style.background = `rgb(${r},${g},${b})`;
 		sw.dataset.terrain = t;
 		sw.title = TERRAIN_NAMES[t];
 		sw.textContent = TERRAIN_NAMES[t];
 		if (t >= 10 && t <= 15) {
-			const dot = document.createElement('div');
-			dot.className = 'minedot';
+			let dot = document.createElement("div");
+			dot.className = "minedot";
 			sw.appendChild(dot);
 		}
-		sw.addEventListener('click', () => {
+		sw.addEventListener("click", () => {
 			terrain = t;
-			document.querySelectorAll('.swatch').forEach(el => el.classList.remove('active'));
-			sw.classList.add('active');
-			if (tool !== 'paint' && tool !== 'fill') setTool('paint');
+			document.querySelectorAll(".swatch").forEach(el => el.classList.remove("active"));
+			sw.classList.add("active");
+			if (tool !== "paint" && tool !== "fill") set_tool("paint");
 		});
 		pal.appendChild(sw);
 	}
 }
 
-function setTool(t) {
+function set_tool(t) {
 	tool = t;
-	document.querySelectorAll('button.tool').forEach(b =>
-		b.classList.toggle('active', b.dataset.tool === t));
+	document.querySelectorAll("button.tool").forEach(b =>
+		b.classList.toggle("active", b.dataset.tool === t));
 }
-document.querySelectorAll('button.tool').forEach(b =>
-	b.addEventListener('click', () => setTool(b.dataset.tool)));
-document.querySelectorAll('button.sym').forEach(b =>
-	b.addEventListener('click', () =>
-		setSymmetry(b.dataset.sym === 'off' ? null : b.dataset.sym)));
-document.querySelectorAll('button.sympar').forEach(b =>
-	b.addEventListener('click', () => setParity(b.dataset.parity)));
-document.getElementById('brushSize').addEventListener('change', e => {
-	brushSize = Number(e.target.value);
+document.querySelectorAll("button.tool").forEach(b =>
+	b.addEventListener("click", () => set_tool(b.dataset.tool)));
+document.querySelectorAll("button.sym").forEach(b =>
+	b.addEventListener("click", () =>
+		set_symmetry(b.dataset.sym === "off" ? null : b.dataset.sym)));
+document.querySelectorAll("button.sympar").forEach(b =>
+	b.addEventListener("click", () => set_parity(b.dataset.parity)));
+document.getElementById("brushSize").addEventListener("change", e => {
+	brush_size = Number(e.target.value);
 });
 
 /* ---------- mouse input ---------- */
 let painting = false;
-let paintTerrain = 7;
-let lastTile = null;
+let paint_terrain = 7;
+let last_tile = null;
 /* Pre-stroke snapshot, pushed onto the undo stack only once the stroke
  * actually changes a cell (mirrors included), so no-op clicks leave the
  * undo and redo stacks alone. */
-let paintSnap = null;
+let paint_snap = null;
 let panning = false;
-let panStart = null;
-let spaceDown = false;
-let objDrag = null; /* {type, index, undoPushed} */
+let pan_start = null;
+let space_down = false;
+let obj_drag = null; /* {type, index, undo_pushed} */
 
-canvas.addEventListener('contextmenu', e => e.preventDefault());
+canvas.addEventListener("contextmenu", e => e.preventDefault());
 
-function updateHoverStatus(t) {
-	const inMap = t.x >= 0 && t.x < MAP_SIZE && t.y >= 0 && t.y < MAP_SIZE;
-	statusPos.textContent = inMap ? `${t.x}, ${t.y}` : '';
-	statusTerrain.textContent = inMap
-		? TERRAIN_NAMES[doc.grid[t.y * MAP_SIZE + t.x]] + (inRegion(t.x, t.y) ? '' : ' (outside saved area)')
-		: '';
+function update_hover_status(t) {
+	let in_map = t.x >= 0 && t.x < MAP_SIZE && t.y >= 0 && t.y < MAP_SIZE;
+	status_pos.textContent = in_map ? `${t.x}, ${t.y}` : "";
+	status_terrain.textContent = in_map
+		? TERRAIN_NAMES[doc.grid[t.y * MAP_SIZE + t.x]] + (in_region(t.x, t.y) ? "" : " (outside saved area)")
+		: "";
 }
 
 /* Re-check the tile under the last known mouse position, for changes
  * that alter the map without the mouse moving (undo/redo, menu fixes). */
-let lastMouse = null;
-function refreshHoverStatus() {
-	if (lastMouse) updateHoverStatus(screenToTile(lastMouse.mx, lastMouse.my));
+let last_mouse = null;
+function refresh_hover_status() {
+	if (last_mouse) update_hover_status(screen_to_tile(last_mouse.mx, last_mouse.my));
 }
 
-canvas.addEventListener('pointerdown', e => {
+canvas.addEventListener("pointerdown", e => {
 	canvas.setPointerCapture(e.pointerId);
-	lastMouse = { mx: e.offsetX, my: e.offsetY };
-	const t = screenToTile(e.offsetX, e.offsetY);
+	last_mouse = { mx: e.offsetX, my: e.offsetY };
+	let t = screen_to_tile(e.offsetX, e.offsetY);
 
-	if (e.button === 1 || (e.button === 0 && spaceDown)) {
+	if (e.button === 1 || (e.button === 0 && space_down)) {
 		panning = true;
-		panStart = { mx: e.offsetX, my: e.offsetY, ox: view.ox, oy: view.oy };
-		canvas.style.cursor = 'grabbing';
+		pan_start = { mx: e.offsetX, my: e.offsetY, ox: view.ox, oy: view.oy };
+		canvas.style.cursor = "grabbing";
 		return;
 	}
 
@@ -1064,201 +1064,201 @@ canvas.addEventListener('pointerdown', e => {
 	 * and allow dragging it; an empty tile clears the selection.
 	 * Delete/Backspace removes the selected object. */
 	if (e.button === 2) {
-		selected = objectAtAnyType(t.x, t.y);
-		objDrag = selected
-			? { ...selected, undoPushed: false, mirrors: captureDragMirrors(selected.type, selected.index) }
+		selected = object_at_any_type(t.x, t.y);
+		obj_drag = selected
+			? { ...selected, undo_pushed: false, mirrors: capture_drag_mirrors(selected.type, selected.index) }
 			: null;
-		renderProps();
-		requestDraw();
+		render_props();
+		request_draw();
 		return;
 	}
 
-	if (tool === 'paint' && e.button === 0) {
+	if (tool === "paint" && e.button === 0) {
 		painting = true;
-		paintTerrain = terrain;
-		lastTile = t;
-		paintSnap = snapshot();
-		if (paintBrush(t.x, t.y, paintTerrain)) {
-			pushUndoEntry(paintSnap);
-			paintSnap = null;
-			setDirty(true);
+		paint_terrain = terrain;
+		last_tile = t;
+		paint_snap = snapshot();
+		if (paint_brush(t.x, t.y, paint_terrain)) {
+			push_undo_entry(paint_snap);
+			paint_snap = null;
+			set_dirty(true);
 		}
-		requestDraw();
-	} else if (tool === 'fill' && e.button === 0) {
-		const snap = snapshot();
-		if (floodFill(t.x, t.y, terrain)) {
-			pushUndoEntry(snap);
-			setDirty(true);
-			if (selected) renderProps();
+		request_draw();
+	} else if (tool === "fill" && e.button === 0) {
+		let snap = snapshot();
+		if (flood_fill(t.x, t.y, terrain)) {
+			push_undo_entry(snap);
+			set_dirty(true);
+			if (selected) render_props();
 		}
-		requestDraw();
-	} else if (tool === 'pill' || tool === 'base' || tool === 'start') {
-		const listName = OBJECT_LIST[tool];
+		request_draw();
+	} else if (tool === "pill" || tool === "base" || tool === "start") {
+		let list_name = OBJECT_LIST[tool];
 		if (e.button === 0) {
 			/* placement only: manipulating existing objects is right-click's job */
-			if (objectAtAnyType(t.x, t.y)) {
-				statusMsg('tile already occupied — right-click to select or drag');
+			if (object_at_any_type(t.x, t.y)) {
+				status_msg("tile already occupied — right-click to select or drag");
 				return;
 			}
-			if (inRegion(t.x, t.y)) {
-				if (tool === 'start' && doc.grid[t.y * MAP_SIZE + t.x] !== DEEP_SEA) {
-					statusMsg('spawn points must be on deep sea');
+			if (in_region(t.x, t.y)) {
+				if (tool === "start" && doc.grid[t.y * MAP_SIZE + t.x] !== DEEP_SEA) {
+					status_msg("spawn points must be on deep sea");
 					return;
 				}
-				const orbit = symOrbit(t.x, t.y);
-				if (doc[listName].length + orbit.length > 16) {
-					statusMsg(orbit.length > 1
+				let orbit = sym_orbit(t.x, t.y);
+				if (doc[list_name].length + orbit.length > 16) {
+					status_msg(orbit.length > 1
 						? `no room for ${orbit.length} mirrored ${OBJECT_LABEL_PLURAL[tool]} — nothing placed`
 						: `max 16 ${OBJECT_LABEL_PLURAL[tool]} reached`);
 					return;
 				}
 				/* all-or-nothing: any bad mirror position vetoes the placement */
-				for (const m of orbit.slice(1)) {
-					if (!inRegion(m.x, m.y)) {
+				for (let m of orbit.slice(1)) {
+					if (!in_region(m.x, m.y)) {
 						/* only reachable with an even axis, whose far edge has no image */
-						statusMsg(`mirrored tile (${m.x}, ${m.y}) is outside the saved area — nothing placed`);
+						status_msg(`mirrored tile (${m.x}, ${m.y}) is outside the saved area — nothing placed`);
 						return;
 					}
-					if (objectAtAnyType(m.x, m.y)) {
-						statusMsg(`mirrored tile (${m.x}, ${m.y}) already occupied — nothing placed`);
+					if (object_at_any_type(m.x, m.y)) {
+						status_msg(`mirrored tile (${m.x}, ${m.y}) already occupied — nothing placed`);
 						return;
 					}
-					if (tool === 'start' && doc.grid[m.y * MAP_SIZE + m.x] !== DEEP_SEA) {
-						statusMsg(`mirrored tile (${m.x}, ${m.y}) is not deep sea — nothing placed`);
+					if (tool === "start" && doc.grid[m.y * MAP_SIZE + m.x] !== DEEP_SEA) {
+						status_msg(`mirrored tile (${m.x}, ${m.y}) is not deep sea — nothing placed`);
 						return;
 					}
 				}
-				pushUndo();
-				const baseDir = tool === 'start' ? spawnDirToward(t.x, t.y) : 0;
-				for (const m of orbit) {
-					const o = { x: m.x, y: m.y, ...OBJECT_DEFAULTS[tool] };
-					if (tool === 'start') o.dir = m.dir(baseDir);
-					doc[listName].push(o);
+				push_undo();
+				let base_dir = tool === "start" ? spawn_dir_toward(t.x, t.y) : 0;
+				for (let m of orbit) {
+					let o = { x: m.x, y: m.y, ...OBJECT_DEFAULTS[tool] };
+					if (tool === "start") o.dir = m.dir(base_dir);
+					doc[list_name].push(o);
 				}
-				selected = { type: tool, index: doc[listName].length - orbit.length };
+				selected = { type: tool, index: doc[list_name].length - orbit.length };
 				/* the just-placed copies become drag followers, so a continued
 				 * drag keeps the whole set symmetric */
-				objDrag = { type: tool, index: selected.index, undoPushed: true,
-										mirrors: captureDragMirrors(tool, selected.index) };
-				setDirty(true);
-				updateCounts();
+				obj_drag = { type: tool, index: selected.index, undo_pushed: true,
+										mirrors: capture_drag_mirrors(tool, selected.index) };
+				set_dirty(true);
+				update_counts();
 			}
-			renderProps();
-			requestDraw();
+			render_props();
+			request_draw();
 		}
 	}
 
-	updateHoverStatus(t); /* clicks change the tile without moving the mouse */
+	update_hover_status(t); /* clicks change the tile without moving the mouse */
 });
 
-canvas.addEventListener('pointermove', e => {
-	lastMouse = { mx: e.offsetX, my: e.offsetY };
-	const t = screenToTile(e.offsetX, e.offsetY);
+canvas.addEventListener("pointermove", e => {
+	last_mouse = { mx: e.offsetX, my: e.offsetY };
+	let t = screen_to_tile(e.offsetX, e.offsetY);
 
-	if (panning && panStart) {
-		view.ox = panStart.ox - (e.offsetX - panStart.mx) / view.zoom;
-		view.oy = panStart.oy - (e.offsetY - panStart.my) / view.zoom;
-		clampView();
-		requestDraw();
-	} else if (painting && lastTile) {
-		if (t.x !== lastTile.x || t.y !== lastTile.y) {
-			if (paintLine(lastTile.x, lastTile.y, t.x, t.y, paintTerrain)) {
-				if (paintSnap) {
-					pushUndoEntry(paintSnap);
-					paintSnap = null;
+	if (panning && pan_start) {
+		view.ox = pan_start.ox - (e.offsetX - pan_start.mx) / view.zoom;
+		view.oy = pan_start.oy - (e.offsetY - pan_start.my) / view.zoom;
+		clamp_view();
+		request_draw();
+	} else if (painting && last_tile) {
+		if (t.x !== last_tile.x || t.y !== last_tile.y) {
+			if (paint_line(last_tile.x, last_tile.y, t.x, t.y, paint_terrain)) {
+				if (paint_snap) {
+					push_undo_entry(paint_snap);
+					paint_snap = null;
 				}
-				setDirty(true);
+				set_dirty(true);
 			}
-			lastTile = t;
-			requestDraw();
+			last_tile = t;
+			request_draw();
 		}
-	} else if (objDrag) {
-		dragObjectTo(t.x, t.y);
+	} else if (obj_drag) {
+		drag_object_to(t.x, t.y);
 	}
 
-	updateHoverStatus(t);
+	update_hover_status(t);
 });
 
 /* Idempotent: also reached via pointercancel / lostpointercapture / blur,
  * so a gesture can't stay live after the OS or a focus change eats the
  * pointerup (which would let bare hover keep painting or dragging). */
-function endGesture() {
-	if (painting && selected) renderProps(); /* refresh "terrain under" readout */
+function end_gesture() {
+	if (painting && selected) render_props(); /* refresh "terrain under" readout */
 	painting = false;
-	lastTile = null;
-	paintSnap = null;
+	last_tile = null;
+	paint_snap = null;
 	panning = false;
-	panStart = null;
-	objDrag = null;
-	canvas.style.cursor = spaceDown ? 'grab' : 'crosshair';
+	pan_start = null;
+	obj_drag = null;
+	canvas.style.cursor = space_down ? "grab" : "crosshair";
 }
-canvas.addEventListener('pointerup', endGesture);
-canvas.addEventListener('pointercancel', endGesture);
-canvas.addEventListener('lostpointercapture', endGesture);
-window.addEventListener('blur', () => {
-	spaceDown = false; /* the matching keyup will never arrive */
-	endGesture();
+canvas.addEventListener("pointerup", end_gesture);
+canvas.addEventListener("pointercancel", end_gesture);
+canvas.addEventListener("lostpointercapture", end_gesture);
+window.addEventListener("blur", () => {
+	space_down = false; /* the matching keyup will never arrive */
+	end_gesture();
 });
 
-canvas.addEventListener('wheel', e => {
+canvas.addEventListener("wheel", e => {
 	e.preventDefault();
-	const idx = ZOOMS.indexOf(view.zoom);
-	const nidx = Math.max(0, Math.min(ZOOMS.length - 1, idx + (e.deltaY < 0 ? 1 : -1)));
-	zoomTo(ZOOMS[nidx], e.offsetX, e.offsetY);
+	let idx = ZOOMS.indexOf(view.zoom);
+	let nidx = Math.max(0, Math.min(ZOOMS.length - 1, idx + (e.deltaY < 0 ? 1 : -1)));
+	zoom_to(ZOOMS[nidx], e.offsetX, e.offsetY);
 }, { passive: false });
 
-function zoomTo(z, mx, my) {
+function zoom_to(z, mx, my) {
 	if (z === view.zoom) return;
-	const { w, h } = cssSize();
+	let { w, h } = css_size();
 	if (mx === undefined) { mx = w / 2; my = h / 2; }
-	const tx = view.ox + mx / view.zoom;
-	const ty = view.oy + my / view.zoom;
+	let tx = view.ox + mx / view.zoom;
+	let ty = view.oy + my / view.zoom;
 	view.zoom = z;
 	view.ox = tx - mx / z;
 	view.oy = ty - my / z;
-	clampView();
-	statusZoom.textContent = `zoom ${z}×`;
-	requestDraw();
+	clamp_view();
+	status_zoom.textContent = `zoom ${z}×`;
+	request_draw();
 }
 
-function zoomStep(delta) {
-	const idx = ZOOMS.indexOf(view.zoom);
-	const nidx = Math.max(0, Math.min(ZOOMS.length - 1, idx + delta));
-	zoomTo(ZOOMS[nidx]);
+function zoom_step(delta) {
+	let idx = ZOOMS.indexOf(view.zoom);
+	let nidx = Math.max(0, Math.min(ZOOMS.length - 1, idx + delta));
+	zoom_to(ZOOMS[nidx]);
 }
 
-function zoomFit() {
-	const { w, h } = cssSize();
+function zoom_fit() {
+	let { w, h } = css_size();
 	let z = ZOOMS[0];
-	for (const c of ZOOMS) if (c * MAP_SIZE <= Math.min(w, h)) z = c;
+	for (let c of ZOOMS) if (c * MAP_SIZE <= Math.min(w, h)) z = c;
 	view.zoom = z;
 	view.ox = 128 - w / (2 * z);
 	view.oy = 128 - h / (2 * z);
-	statusZoom.textContent = `zoom ${z}×`;
-	requestDraw();
+	status_zoom.textContent = `zoom ${z}×`;
+	request_draw();
 }
 
-window.addEventListener('keydown', e => {
-	if (e.code === 'Space' && !e.repeat && document.activeElement.tagName !== 'INPUT') {
-		spaceDown = true;
-		canvas.style.cursor = 'grab';
+window.addEventListener("keydown", e => {
+	if (e.code === "Space" && !e.repeat && document.activeElement.tagName !== "INPUT") {
+		space_down = true;
+		canvas.style.cursor = "grab";
 		e.preventDefault();
 	}
-	if (e.code === 'Escape') {
+	if (e.code === "Escape") {
 		selected = null;
-		renderProps();
-		requestDraw();
+		render_props();
+		request_draw();
 	}
-	if ((e.code === 'Delete' || e.code === 'Backspace') &&
-			selected && document.activeElement.tagName !== 'INPUT') {
-		deleteSelected();
+	if ((e.code === "Delete" || e.code === "Backspace") &&
+			selected && document.activeElement.tagName !== "INPUT") {
+		delete_selected();
 		e.preventDefault();
 	}
 });
-window.addEventListener('keyup', e => {
-	if (e.code === 'Space') {
-		spaceDown = false;
-		if (!panning) canvas.style.cursor = 'crosshair';
+window.addEventListener("keyup", e => {
+	if (e.code === "Space") {
+		space_down = false;
+		if (!panning) canvas.style.cursor = "crosshair";
 	}
 });
 
@@ -1277,21 +1277,21 @@ const SPAWN_SLOTS = Array.from({ length: 16 }, (_, i) => [0, i]);
 /* Hungarian algorithm (Kuhn–Munkres with potentials), rows n ≤ cols m.
  * Returns assign[i] = column chosen for row i, minimizing total cost. */
 function hungarian(cost) {
-	const n = cost.length, m = cost[0].length;
-	const u = new Array(n + 1).fill(0), v = new Array(m + 1).fill(0);
-	const p = new Array(m + 1).fill(0), way = new Array(m + 1).fill(0);
+	let n = cost.length, m = cost[0].length;
+	let u = new Array(n + 1).fill(0), v = new Array(m + 1).fill(0);
+	let p = new Array(m + 1).fill(0), way = new Array(m + 1).fill(0);
 	for (let i = 1; i <= n; i++) {
 		p[0] = i;
 		let j0 = 0;
-		const minv = new Array(m + 1).fill(Infinity);
-		const used = new Array(m + 1).fill(false);
+		let minv = new Array(m + 1).fill(Infinity);
+		let used = new Array(m + 1).fill(false);
 		do {
 			used[j0] = true;
-			const i0 = p[j0];
+			let i0 = p[j0];
 			let delta = Infinity, j1 = -1;
 			for (let j = 1; j <= m; j++) {
 				if (used[j]) continue;
-				const cur = cost[i0 - 1][j - 1] - u[i0] - v[j];
+				let cur = cost[i0 - 1][j - 1] - u[i0] - v[j];
 				if (cur < minv[j]) { minv[j] = cur; way[j] = j0; }
 				if (minv[j] < delta) { delta = minv[j]; j1 = j; }
 			}
@@ -1301,202 +1301,202 @@ function hungarian(cost) {
 			}
 			j0 = j1;
 		} while (p[j0] !== 0);
-		do { const j1 = way[j0]; p[j0] = p[j1]; j0 = j1; } while (j0);
+		do { let j1 = way[j0]; p[j0] = p[j1]; j0 = j1; } while (j0);
 	}
-	const assign = new Array(n);
+	let assign = new Array(n);
 	for (let j = 1; j <= m; j++) if (p[j] > 0) assign[p[j] - 1] = j - 1;
 	return assign;
 }
 
 /* Reorder a list so index order matches the given grid slots intuitively:
  * percentile-rank positions, squared-distance cost, optimal assignment. */
-function statusGridOrder(list, slots) {
-	const n = list.length;
-	const idx = [...list.keys()];
-	const byX = idx.slice().sort((a, b) => list[a].x - list[b].x || list[a].y - list[b].y);
-	const byY = idx.slice().sort((a, b) => list[a].y - list[b].y || list[a].x - list[b].x);
-	const rx = new Array(n), ry = new Array(n);
-	byX.forEach((i, r) => { rx[i] = r; });
-	byY.forEach((i, r) => { ry[i] = r; });
-	const span = Math.max(1, n - 1);
-	const gw = Math.max(...slots.map(s => s[0])); /* grid extents for rank scaling */
-	const gh = Math.max(...slots.map(s => s[1]));
-	const cost = list.map((o, i) => slots.map(([sx, sy]) => {
-		const dx = (gw * rx[i]) / span - sx;
-		const dy = (gh * ry[i]) / span - sy;
+function status_grid_order(list, slots) {
+	let n = list.length;
+	let idx = [...list.keys()];
+	let by_x = idx.slice().sort((a, b) => list[a].x - list[b].x || list[a].y - list[b].y);
+	let by_y = idx.slice().sort((a, b) => list[a].y - list[b].y || list[a].x - list[b].x);
+	let rx = new Array(n), ry = new Array(n);
+	by_x.forEach((i, r) => { rx[i] = r; });
+	by_y.forEach((i, r) => { ry[i] = r; });
+	let span = Math.max(1, n - 1);
+	let gw = Math.max(...slots.map(s => s[0])); /* grid extents for rank scaling */
+	let gh = Math.max(...slots.map(s => s[1]));
+	let cost = list.map((o, i) => slots.map(([sx, sy]) => {
+		let dx = (gw * rx[i]) / span - sx;
+		let dy = (gh * ry[i]) / span - sy;
 		return dx * dx + dy * dy;
 	}));
-	const assign = hungarian(cost);
+	let assign = hungarian(cost);
 	return idx.sort((a, b) => assign[a] - assign[b]).map(i => list[i]);
 }
 
-/* Each cmd* fix supports quiet mode: no undo/status/redraw (the caller
+/* Each cmd_* fix supports quiet mode: no undo/status/redraw (the caller
  * batches those), and returns whether anything changed. */
-function cmdFixOrder(listName, label, slots, quiet) {
-	const list = doc[listName];
+function cmd_fix_order(list_name, label, slots, quiet) {
+	let list = doc[list_name];
 	if (list.length < 2) return false;
-	const reordered = statusGridOrder(list, slots);
+	let reordered = status_grid_order(list, slots);
 	if (reordered.every((o, i) => o === list[i])) {
-		if (!quiet) statusMsg(`${label} already in status-grid order`);
+		if (!quiet) status_msg(`${label} already in status-grid order`);
 		return false;
 	}
-	if (!quiet) pushUndo();
+	if (!quiet) push_undo();
 	/* the selection follows its object to the object's new index */
-	if (selected && OBJECT_LIST[selected.type] === listName) {
+	if (selected && OBJECT_LIST[selected.type] === list_name) {
 		selected.index = reordered.indexOf(list[selected.index]);
 	}
-	doc[listName] = reordered;
+	doc[list_name] = reordered;
 	if (!quiet) {
-		setDirty(true);
-		renderProps();
-		requestDraw();
-		statusMsg(`${label} reordered to match status grid`);
+		set_dirty(true);
+		render_props();
+		request_draw();
+		status_msg(`${label} reordered to match status grid`);
 	}
 	return true;
 }
 
 /* Re-aim every spawn at the land centre of mass (as placement does). */
-function cmdFixSpawnDirs(quiet) {
+function cmd_fix_spawn_dirs(quiet) {
 	if (!doc.starts.length) return false;
-	const newDirs = doc.starts.map(s => spawnDirToward(s.x, s.y));
-	if (newDirs.every((d, i) => d === doc.starts[i].dir)) {
-		if (!quiet) statusMsg('spawn directions already correct');
+	let new_dirs = doc.starts.map(s => spawn_dir_toward(s.x, s.y));
+	if (new_dirs.every((d, i) => d === doc.starts[i].dir)) {
+		if (!quiet) status_msg("spawn directions already correct");
 		return false;
 	}
-	if (!quiet) pushUndo();
-	newDirs.forEach((d, i) => { doc.starts[i].dir = d; });
+	if (!quiet) push_undo();
+	new_dirs.forEach((d, i) => { doc.starts[i].dir = d; });
 	if (!quiet) {
-		setDirty(true);
-		renderProps();
-		requestDraw();
-		statusMsg('spawn directions re-aimed at land centre');
+		set_dirty(true);
+		render_props();
+		request_draw();
+		status_msg("spawn directions re-aimed at land centre");
 	}
 	return true;
 }
 
 /* Reset all objects of a type to neutral ownership and default stats. */
-function cmdResetObjects(type, label, quiet, overrides) {
-	const list = doc[OBJECT_LIST[type]];
-	const defaults = { ...OBJECT_DEFAULTS[type], ...overrides };
+function cmd_reset_objects(type, label, quiet, overrides) {
+	let list = doc[OBJECT_LIST[type]];
+	let defaults = { ...OBJECT_DEFAULTS[type], ...overrides };
 	if (!list.length) return false;
 	if (list.every(o => Object.entries(defaults).every(([k, v]) => o[k] === v))) {
-		if (!quiet) statusMsg(`${label} already at defaults`);
+		if (!quiet) status_msg(`${label} already at defaults`);
 		return false;
 	}
-	if (!quiet) pushUndo();
-	for (const o of list) Object.assign(o, defaults);
+	if (!quiet) push_undo();
+	for (let o of list) Object.assign(o, defaults);
 	if (!quiet) {
-		setDirty(true);
-		renderProps();
-		requestDraw();
-		statusMsg(`${label} reset to neutral defaults`);
+		set_dirty(true);
+		render_props();
+		request_draw();
+		status_msg(`${label} reset to neutral defaults`);
 	}
 	return true;
 }
 
 /* Convert every deep sea tile that touches land (orthogonally or
  * diagonally) to river, giving coastlines a shallow-water buffer.
- * Neighbours are read via getPos so tiles outside the saved region
+ * Neighbours are read via get_pos so tiles outside the saved region
  * count as deep sea, matching what the file will actually contain.
  * Tiles under spawn points are skipped: spawns require deep sea. */
-function cmdBufferSea(quiet) {
+function cmd_buffer_sea(quiet) {
 	const RIVER = 1;
-	const isWater = t => t === DEEP_SEA || t === RIVER || t === 9; /* 9 = boat */
-	const toConvert = [];
+	let is_water = t => t === DEEP_SEA || t === RIVER || t === 9; /* 9 = boat */
+	let to_convert = [];
 	for (let y = RGN_LO; y < RGN_HI; y++) {
 		for (let x = RGN_LO; x < RGN_HI; x++) {
 			if (doc.grid[y * MAP_SIZE + x] !== DEEP_SEA) continue;
-			if (objectAt('start', x, y) >= 0) continue;
-			let touchesLand = false;
-			for (let dy = -1; dy <= 1 && !touchesLand; dy++) {
+			if (object_at("start", x, y) >= 0) continue;
+			let touches_land = false;
+			for (let dy = -1; dy <= 1 && !touches_land; dy++) {
 				for (let dx = -1; dx <= 1; dx++) {
-					if ((dx || dy) && !isWater(BoloMap.getPos(doc.grid, x + dx, y + dy))) {
-						touchesLand = true;
+					if ((dx || dy) && !is_water(BoloMap.get_pos(doc.grid, x + dx, y + dy))) {
+						touches_land = true;
 						break;
 					}
 				}
 			}
-			if (touchesLand) toConvert.push(y * MAP_SIZE + x);
+			if (touches_land) to_convert.push(y * MAP_SIZE + x);
 		}
 	}
-	if (!toConvert.length) {
-		if (!quiet) statusMsg('sea already buffered');
+	if (!to_convert.length) {
+		if (!quiet) status_msg("sea already buffered");
 		return false;
 	}
-	if (!quiet) pushUndo();
-	for (const i of toConvert) doc.grid[i] = RIVER;
-	rebuildOffscreen();
+	if (!quiet) push_undo();
+	for (let i of to_convert) doc.grid[i] = RIVER;
+	rebuild_offscreen();
 	if (!quiet) {
-		setDirty(true);
-		renderProps();
-		refreshHoverStatus();
-		requestDraw();
-		statusMsg(`buffered the sea: ${toConvert.length} tile${toConvert.length === 1 ? '' : 's'} converted to river`);
+		set_dirty(true);
+		render_props();
+		refresh_hover_status();
+		request_draw();
+		status_msg(`buffered the sea: ${to_convert.length} tile${to_convert.length === 1 ? "" : "s"} converted to river`);
 	}
 	return true;
 }
 
 /* Run every fix as one undoable step. */
-function cmdApplyAllFixes(pillOverrides) {
-	const snap = snapshot();
-	const changed = [
-		cmdFixOrder('pills', 'pillboxes', STATUS_SLOTS, true),
-		cmdFixOrder('bases', 'bases', STATUS_SLOTS, true),
-		cmdFixOrder('starts', 'spawns', SPAWN_SLOTS, true),
-		cmdFixSpawnDirs(true),
-		cmdResetObjects('pill', 'pillboxes', true, pillOverrides),
-		cmdResetObjects('base', 'bases', true),
+function cmd_apply_all_fixes(pill_overrides) {
+	let snap = snapshot();
+	let changed = [
+		cmd_fix_order("pills", "pillboxes", STATUS_SLOTS, true),
+		cmd_fix_order("bases", "bases", STATUS_SLOTS, true),
+		cmd_fix_order("starts", "spawns", SPAWN_SLOTS, true),
+		cmd_fix_spawn_dirs(true),
+		cmd_reset_objects("pill", "pillboxes", true, pill_overrides),
+		cmd_reset_objects("base", "bases", true),
 	].filter(Boolean).length;
 	if (!changed) {
-		statusMsg('no fixes needed');
+		status_msg("no fixes needed");
 		return;
 	}
-	pushUndoEntry(snap);
-	setDirty(true);
-	renderProps();
-	requestDraw();
-	statusMsg(`applied ${changed} fix${changed === 1 ? '' : 'es'}`);
+	push_undo_entry(snap);
+	set_dirty(true);
+	render_props();
+	request_draw();
+	status_msg(`applied ${changed} fix${changed === 1 ? "" : "es"}`);
 }
 
 /* ---------- file operations ---------- */
-function loadDoc(map, path) {
+function load_doc(map, path) {
 	/* Like undo/redo: a load can land mid-gesture (menu accelerators fire
 	 * while a button is held, and a drop resolves whenever it resolves), so
 	 * end the gesture first — otherwise a live stroke or drag carries on
 	 * into the fresh document, painting it or moving objects the user never
 	 * grabbed, through indices that now mean something else. Before the
 	 * swap, so the gesture unwinds against the document it belonged to. */
-	endGesture();
+	end_gesture();
 	doc = map;
-	filePath = path;
+	file_path = path;
 	selected = null;
-	setSymmetry(null, true); /* a fresh document starts unsymmetric */
-	undoStack.length = 0;
-	redoStack.length = 0;
-	rebuildOffscreen();
-	renderProps();
-	updateCounts();
-	setDirty(false);
-	autoDetectSymmetry(); /* may re-dirty the doc if it recentres */
-	zoomFit();
+	set_symmetry(null, true); /* a fresh document starts unsymmetric */
+	undo_stack.length = 0;
+	redo_stack.length = 0;
+	rebuild_offscreen();
+	render_props();
+	update_counts();
+	set_dirty(false);
+	auto_detect_symmetry(); /* may re-dirty the doc if it recentres */
+	zoom_fit();
 }
 
 /* A props-field value still being typed is only committed by its change
  * event (Enter or blur), which a menu accelerator doesn't trigger — so
  * anything that serializes or discards the doc must force the commit
  * first. Blurring the field fires its change handler synchronously. */
-function commitPendingEdit() {
-	const el = document.activeElement;
-	if (el && el.tagName === 'INPUT' && propsEl.contains(el)) el.blur();
+function commit_pending_edit() {
+	let el = document.activeElement;
+	if (el && el.tagName === "INPUT" && props_el.contains(el)) el.blur();
 }
 
 /* Never window.confirm()/alert() here: Chromium's blocking dialogs break
  * keyboard focus in Electron (inputs stop accepting typing until the
  * window is refocused), so all prompts go through main's native dialogs. */
-async function confirmDiscard() {
-	commitPendingEdit(); /* an uncommitted edit must count as dirty here */
+async function confirm_discard() {
+	commit_pending_edit(); /* an uncommitted edit must count as dirty here */
 	if (!dirty) return true;
-	return api.confirmDiscard();
+	return api.confirm_discard();
 }
 
 /* Document-level commands — New, Open, drop, Save, the close prompt — all
@@ -1504,80 +1504,80 @@ async function confirmDiscard() {
  * than let them race and reconcile afterwards, only one runs at a time: a
  * command that arrives while one is live is refused, so the operation
  * already underway wins. That single invariant is what lets a save assume
- * the document can't be swapped out from under it (loadDoc is only reached
+ * the document can't be swapped out from under it (load_doc is only reached
  * through gated commands), and lets a load assume no other load will land
  * on top of its result.
  *
  * Edits are deliberately NOT gated. The renderer keeps handling input while
  * main writes the file, so a stroke can still land between serializing the
- * bytes and the write completing — that is what editGen is for. */
-let fileOpDone = null; /* resolves when the in-flight command finishes */
+ * bytes and the write completing — that is what edit_gen is for. */
+let file_op_done = null; /* resolves when the in-flight command finishes */
 
-async function fileOp(fn) {
-	if (fileOpDone) {
-		statusMsg('a file operation is already in progress');
+async function file_op(fn) {
+	if (file_op_done) {
+		status_msg("a file operation is already in progress");
 		return;
 	}
 	let release;
-	fileOpDone = new Promise(r => { release = r; });
+	file_op_done = new Promise(r => { release = r; });
 	try {
 		return await fn();
 	} catch (err) {
 		/* Command bodies show their own dialogs and aren't expected to
 		 * throw; a rejection escaping one would otherwise vanish into the
 		 * devtools console, the command silently doing nothing. */
-		api.showError('Unexpected error', String(err));
+		api.show_error("Unexpected error", String(err));
 	} finally {
-		fileOpDone = null;
+		file_op_done = null;
 		release();
 	}
 }
 
 /* Wait out an in-flight command instead of being refused. Looped, because
  * another command can claim the gate in the moment we resume. */
-async function fileOpIdle() {
-	while (fileOpDone) await fileOpDone;
+async function file_op_idle() {
+	while (file_op_done) await file_op_done;
 }
 
-function cmdNew() {
-	fileOp(async () => {
-		if (!await confirmDiscard()) return;
-		loadDoc(BoloMap.newMap(), null);
+function cmd_new() {
+	file_op(async () => {
+		if (!await confirm_discard()) return;
+		load_doc(BoloMap.new_map(), null);
 	});
 }
 
-function loadFromBytes(data, path) {
+function load_from_bytes(data, path) {
 	let map;
 	try {
-		map = BoloMap.parseMap(data); /* parse before swapping: a bad file loses nothing */
+		map = BoloMap.parse_map(data); /* parse before swapping: a bad file loses nothing */
 	} catch (err) {
-		api.showError('Could not read map', err.message);
+		api.show_error("Could not read map", err.message);
 		return;
 	}
-	loadDoc(map, path);
+	load_doc(map, path);
 }
 
-function cmdOpen() {
-	fileOp(async () => {
-		if (!await confirmDiscard()) return;
-		const res = await api.openMap();
+function cmd_open() {
+	file_op(async () => {
+		if (!await confirm_discard()) return;
+		let res = await api.open_map();
 		if (res.canceled) {
-			if (res.error) api.showError('Could not open map', res.error);
+			if (res.error) api.show_error("Could not open map", res.error);
 			return;
 		}
-		loadFromBytes(res.data, res.path);
+		load_from_bytes(res.data, res.path);
 	});
 }
 
 /* map passed on the command line (sent by main once the page loads) */
-api.onLoadMap(({ path, data }) => fileOp(() => loadFromBytes(data, path)));
+api.on_load_map(({ path, data }) => file_op(() => load_from_bytes(data, path)));
 
 /* saved settings, pushed by main on every page load; later menu toggles
  * arrive as menu-cmd and are mirrored into main's settings.json there */
-api.onSettings(s => {
-	showPillRange = !!s.showPillRange;
-	basesAsCircles = !!s.basesAsCircles;
-	requestDraw();
+api.on_settings(s => {
+	show_pill_range = !!s.showPillRange;
+	bases_as_circles = !!s.basesAsCircles;
+	request_draw();
 });
 
 /* main defers a dirty-window close to us, for the same prompt as New/Open.
@@ -1585,91 +1585,91 @@ api.onSettings(s => {
  * the time it asks, so a refusal would make the window silently ignore the
  * X. Once the prompt is up it is window-modal, which keeps other commands
  * out for as long as it matters. */
-api.onConfirmClose(async () => {
-	await fileOpIdle();
-	if (await confirmDiscard()) api.confirmClose();
+api.on_confirm_close(async () => {
+	await file_op_idle();
+	if (await confirm_discard()) api.confirm_close();
 });
 
 /* drag & drop a .map anywhere onto the window */
-window.addEventListener('dragover', e => e.preventDefault());
-window.addEventListener('drop', e => {
+window.addEventListener("dragover", e => e.preventDefault());
+window.addEventListener("drop", e => {
 	e.preventDefault();
-	const file = e.dataTransfer.files[0]; /* read now: dataTransfer empties after the event */
+	let file = e.dataTransfer.files[0]; /* read now: dataTransfer empties after the event */
 	if (!file) return;
-	fileOp(async () => {
+	file_op(async () => {
 		if (file.size > MAX_MAP_BYTES) {
-			api.showError('Could not open map', `${file.name} is ${file.size} bytes, far larger than any Bolo map.`);
+			api.show_error("Could not open map", `${file.name} is ${file.size} bytes, far larger than any Bolo map.`);
 			return;
 		}
-		if (!await confirmDiscard()) return;
+		if (!await confirm_discard()) return;
 		let data;
 		try {
 			data = new Uint8Array(await file.arrayBuffer());
 		} catch (err) {
 			/* the file can vanish between the drop and the read (removable
 			 * media, a temp file cleaned up) — surface it like any open error */
-			api.showError('Could not open map', String(err));
+			api.show_error("Could not open map", String(err));
 			return;
 		}
 		let path = null;
-		try { path = api.pathForFile(file) || null; } catch { /* keep null: Save will ask */ }
-		loadFromBytes(data, path);
+		try { path = api.path_for_file(file) || null; } catch { /* keep null: Save will ask */ }
+		load_from_bytes(data, path);
 	});
 });
 
-function cmdSave(as) {
-	fileOp(async () => {
-		commitPendingEdit(); /* must land in the bytes serialized below */
-		const savedGen = editGen;
-		const bytes = BoloMap.serializeMap(doc);
-		const res = await api.saveMap(as ? null : filePath, bytes);
+function cmd_save(as) {
+	file_op(async () => {
+		commit_pending_edit(); /* must land in the bytes serialized below */
+		let saved_gen = edit_gen;
+		let bytes = BoloMap.serialize_map(doc);
+		let res = await api.save_map(as ? null : file_path, bytes);
 		if (res.canceled) {
-			if (res.error) api.showError('Could not save map', res.error);
+			if (res.error) api.show_error("Could not save map", res.error);
 			return;
 		}
-		filePath = res.path;
-		/* The bytes just written hold the state at savedGen. An edit made
+		file_path = res.path;
+		/* The bytes just written hold the state at saved_gen. An edit made
 		 * while the save was in flight isn't in them, so the document stays
-		 * dirty — but undoing back to savedGen's state makes it clean again,
-		 * because the file really does match. refreshDirty also picks up a
+		 * dirty — but undoing back to saved_gen's state makes it clean again,
+		 * because the file really does match. refresh_dirty also picks up a
 		 * Save As rename even when the doc stays dirty. */
-		lastSavedGen = savedGen;
-		refreshDirty();
+		last_saved_gen = saved_gen;
+		refresh_dirty();
 	});
 }
 
-api.onMenu(cmd => {
+api.on_menu(cmd => {
 	switch (cmd) {
-		case 'new': cmdNew(); break;
-		case 'open': cmdOpen(); break;
-		case 'save': cmdSave(false); break;
-		case 'save-as': cmdSave(true); break;
-		case 'undo': undo(); break;
-		case 'redo': redo(); break;
-		case 'fix-base-order': cmdFixOrder('bases', 'bases', STATUS_SLOTS); break;
-		case 'fix-pill-order': cmdFixOrder('pills', 'pillboxes', STATUS_SLOTS); break;
-		case 'fix-start-order': cmdFixOrder('starts', 'spawns', SPAWN_SLOTS); break;
-		case 'fix-start-dirs': cmdFixSpawnDirs(); break;
-		case 'reset-pills': cmdResetObjects('pill', 'pillboxes'); break;
-		case 'reset-pills-slow': cmdResetObjects('pill', 'pillboxes', false, { speed: 100 }); break;
-		case 'reset-bases': cmdResetObjects('base', 'bases'); break;
-		case 'buffer-sea': cmdBufferSea(); break;
-		case 'count-flaws': cmdSymmetryScore(); break;
-		case 'find-flaw': cmdFindFlaw(); break;
-		case 'pill-speeds': cmdPillSpeeds(); break;
-		case 'apply-all-fixes': cmdApplyAllFixes(); break;
-		case 'apply-all-fixes-slow': cmdApplyAllFixes({ speed: 100 }); break;
-		case 'toggle-pill-range': showPillRange = !showPillRange; requestDraw(); break;
-		case 'toggle-base-circles': basesAsCircles = !basesAsCircles; requestDraw(); break;
-		case 'zoom-in': zoomStep(1); break;
-		case 'zoom-out': zoomStep(-1); break;
-		case 'zoom-fit': zoomFit(); break;
+		case "new": cmd_new(); break;
+		case "open": cmd_open(); break;
+		case "save": cmd_save(false); break;
+		case "save-as": cmd_save(true); break;
+		case "undo": undo(); break;
+		case "redo": redo(); break;
+		case "fix-base-order": cmd_fix_order("bases", "bases", STATUS_SLOTS); break;
+		case "fix-pill-order": cmd_fix_order("pills", "pillboxes", STATUS_SLOTS); break;
+		case "fix-start-order": cmd_fix_order("starts", "spawns", SPAWN_SLOTS); break;
+		case "fix-start-dirs": cmd_fix_spawn_dirs(); break;
+		case "reset-pills": cmd_reset_objects("pill", "pillboxes"); break;
+		case "reset-pills-slow": cmd_reset_objects("pill", "pillboxes", false, { speed: 100 }); break;
+		case "reset-bases": cmd_reset_objects("base", "bases"); break;
+		case "buffer-sea": cmd_buffer_sea(); break;
+		case "count-flaws": cmd_symmetry_score(); break;
+		case "find-flaw": cmd_find_flaw(); break;
+		case "pill-speeds": cmd_pill_speeds(); break;
+		case "apply-all-fixes": cmd_apply_all_fixes(); break;
+		case "apply-all-fixes-slow": cmd_apply_all_fixes({ speed: 100 }); break;
+		case "toggle-pill-range": show_pill_range = !show_pill_range; request_draw(); break;
+		case "toggle-base-circles": bases_as_circles = !bases_as_circles; request_draw(); break;
+		case "zoom-in": zoom_step(1); break;
+		case "zoom-out": zoom_step(-1); break;
+		case "zoom-fit": zoom_fit(); break;
 	}
 });
 
 /* ---------- boot ---------- */
 function resize() {
-	const w = canvas.clientWidth, h = canvas.clientHeight;
+	let w = canvas.clientWidth, h = canvas.clientHeight;
 	canvas.width = Math.max(1, Math.round(w * devicePixelRatio));
 	canvas.height = Math.max(1, Math.round(h * devicePixelRatio));
 	/* Draw synchronously: setting width/height blanks the canvas, and the
@@ -1679,12 +1679,12 @@ function resize() {
 }
 new ResizeObserver(resize).observe(canvas);
 
-buildPalette();
-rebuildOffscreen();
-updateCounts();
-updateSymUI();
-renderProps();
-updateTitle();
-statusZoom.textContent = `zoom ${view.zoom}×`;
+build_palette();
+rebuild_offscreen();
+update_counts();
+update_sym_ui();
+render_props();
+update_title();
+status_zoom.textContent = `zoom ${view.zoom}×`;
 resize();
-zoomFit();
+zoom_fit();

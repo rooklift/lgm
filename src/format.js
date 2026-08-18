@@ -17,30 +17,30 @@
  * single nibble repeats (code-6) times. Padded to a whole byte.
  * Squares not covered by any run are deep sea.
  */
-'use strict';
+"use strict";
 (function () {
 
 const MAP_SIZE = 256;
 const DEEP_SEA = 0xff;
 
 const TERRAIN_NAMES = {
-	0: 'Building',
-	1: 'River',
-	2: 'Swamp',
-	3: 'Crater',
-	4: 'Road',
-	5: 'Forest',
-	6: 'Rubble',
-	7: 'Grass',
-	8: 'Shot building',
-	9: 'Boat',
-	10: 'Mined swamp',
-	11: 'Mined crater',
-	12: 'Mined road',
-	13: 'Mined forest',
-	14: 'Mined rubble',
-	15: 'Mined grass',
-	255: 'Deep sea',
+	0: "Building",
+	1: "River",
+	2: "Swamp",
+	3: "Crater",
+	4: "Road",
+	5: "Forest",
+	6: "Rubble",
+	7: "Grass",
+	8: "Shot building",
+	9: "Boat",
+	10: "Mined swamp",
+	11: "Mined crater",
+	12: "Mined road",
+	13: "Mined forest",
+	14: "Mined rubble",
+	15: "Mined grass",
+	255: "Deep sea",
 };
 
 const MAX_PILLS = 16;
@@ -52,55 +52,55 @@ const MAX_STARTS = 16;
 const EDGE_MIN = 20;  /* exclusive */
 const EDGE_MAX = 236; /* exclusive */
 
-function newMap() {
-	const grid = new Uint8Array(MAP_SIZE * MAP_SIZE);
+function new_map() {
+	let grid = new Uint8Array(MAP_SIZE * MAP_SIZE);
 	grid.fill(DEEP_SEA);
 	return { grid, pills: [], bases: [], starts: [] };
 }
 
-function getPos(grid, x, y) {
+function get_pos(grid, x, y) {
 	if (x > EDGE_MIN && x < EDGE_MAX && y > EDGE_MIN && y < EDGE_MAX) {
 		return grid[y * MAP_SIZE + x];
 	}
 	return DEEP_SEA;
 }
 
-function parseMap(bytes) {
-	if (bytes.length < 12) throw new Error('File too short');
-	const magic = String.fromCharCode(...bytes.subarray(0, 8));
-	if (magic !== 'BMAPBOLO') throw new Error('Not a Bolo map (bad BMAPBOLO header)');
+function parse_map(bytes) {
+	if (bytes.length < 12) throw new Error("File too short");
+	let magic = String.fromCharCode(...bytes.subarray(0, 8));
+	if (magic !== "BMAPBOLO") throw new Error("Not a Bolo map (bad BMAPBOLO header)");
 	if (bytes[8] !== 1) throw new Error(`Unsupported map version ${bytes[8]}`);
 
-	const nPills = bytes[9], nBases = bytes[10], nStarts = bytes[11];
-	if (nPills > MAX_PILLS || nBases > MAX_BASES || nStarts > MAX_STARTS) {
-		throw new Error('Too many pills/bases/starts');
+	let n_pills = bytes[9], n_bases = bytes[10], n_starts = bytes[11];
+	if (n_pills > MAX_PILLS || n_bases > MAX_BASES || n_starts > MAX_STARTS) {
+		throw new Error("Too many pills/bases/starts");
 	}
 
 	let p = 12;
-	const need = n => {
-		if (p + n > bytes.length) throw new Error('Unexpected end of file');
+	let need = n => {
+		if (p + n > bytes.length) throw new Error("Unexpected end of file");
 	};
 
-	const pills = [];
-	for (let i = 0; i < nPills; i++) {
+	let pills = [];
+	for (let i = 0; i < n_pills; i++) {
 		need(5);
 		pills.push({ x: bytes[p], y: bytes[p + 1], owner: bytes[p + 2], armour: bytes[p + 3], speed: bytes[p + 4] });
 		p += 5;
 	}
-	const bases = [];
-	for (let i = 0; i < nBases; i++) {
+	let bases = [];
+	for (let i = 0; i < n_bases; i++) {
 		need(6);
 		bases.push({ x: bytes[p], y: bytes[p + 1], owner: bytes[p + 2], armour: bytes[p + 3], shells: bytes[p + 4], mines: bytes[p + 5] });
 		p += 6;
 	}
-	const starts = [];
-	for (let i = 0; i < nStarts; i++) {
+	let starts = [];
+	for (let i = 0; i < n_starts; i++) {
 		need(3);
 		starts.push({ x: bytes[p], y: bytes[p + 1], dir: bytes[p + 2] });
 		p += 3;
 	}
 
-	const grid = new Uint8Array(MAP_SIZE * MAP_SIZE);
+	let grid = new Uint8Array(MAP_SIZE * MAP_SIZE);
 	grid.fill(DEEP_SEA);
 
 	for (;;) {
@@ -110,31 +110,31 @@ function parseMap(bytes) {
 		 * sentinel (04 99 99 99 seen in the wild), which decodes as a harmless
 		 * empty run; we then fall out here like WinBolo does. */
 		if (p + 4 > bytes.length) break;
-		const datalen = bytes[p], y = bytes[p + 1], startx = bytes[p + 2], endx = bytes[p + 3];
+		let datalen = bytes[p], y = bytes[p + 1], startx = bytes[p + 2], endx = bytes[p + 3];
 		p += 4;
 		if (datalen === 4 && y === 0xff && startx === 0xff && endx === 0xff) break; /* terminator */
 		if (datalen < 4) throw new Error(`Bad run length ${datalen} at offset ${p - 4}`);
-		const dataBytes = datalen - 4;
-		need(dataBytes);
+		let data_bytes = datalen - 4;
+		need(data_bytes);
 
-		const nibs = [];
-		for (let i = 0; i < dataBytes; i++) {
+		let nibs = [];
+		for (let i = 0; i < data_bytes; i++) {
 			nibs.push(bytes[p + i] >> 4, bytes[p + i] & 0x0f);
 		}
-		p += dataBytes;
+		p += data_bytes;
 
 		let x = startx, i = 0;
 		while (x < endx && i < nibs.length) {
-			const code = nibs[i++];
+			let code = nibs[i++];
 			if (code >= 8) {
 				/* code-6 identical squares */
-				if (i >= nibs.length) throw new Error('Truncated run payload');
-				const t = nibs[i++];
+				if (i >= nibs.length) throw new Error("Truncated run payload");
+				let t = nibs[i++];
 				for (let k = 0; k < code - 6; k++) grid[y * MAP_SIZE + (x++ & 0xff)] = t;
 			} else {
 				/* code+1 literal squares */
 				for (let k = 0; k < code + 1; k++) {
-					if (i >= nibs.length) throw new Error('Truncated run payload');
+					if (i >= nibs.length) throw new Error("Truncated run payload");
 					grid[y * MAP_SIZE + (x++ & 0xff)] = nibs[i++];
 				}
 			}
@@ -148,60 +148,60 @@ function parseMap(bytes) {
 /* Port of mapPrepareRun: encodes one run starting at (x,y), returns bytes
  * and the advanced cursor. The terminator falls out naturally when the
  * scan reaches (255,255). */
-function prepareRun(grid, x, y) {
+function prepare_run(grid, x, y) {
 	/* Skip deep sea to find the next run (or the end of the map) */
-	while (getPos(grid, x, y) === DEEP_SEA) {
+	while (get_pos(grid, x, y) === DEEP_SEA) {
 		if (x < 0xff) x++;
 		else if (y < 0xff) { x = 0; y++; }
 		else break;
 	}
-	const startx = x;
-	const nibs = [];
+	let startx = x;
+	let nibs = [];
 
 	if (y < 255) {
-		let terrain = getPos(grid, x, y);
+		let terrain = get_pos(grid, x, y);
 		while (terrain !== DEEP_SEA) {
-			if (terrain === getPos(grid, x + 1, y)) {
+			if (terrain === get_pos(grid, x + 1, y)) {
 				/* identical squares: code 8..15 => run of 2..9 */
 				let code = 8;
 				x += 2;
-				while (code < 15 && getPos(grid, x, y) === terrain) { code++; x++; }
+				while (code < 15 && get_pos(grid, x, y) === terrain) { code++; x++; }
 				nibs.push(code, terrain);
 			} else {
 				/* different squares: code 0..7 => 1..8 literals */
 				let code = 0;
 				let ds = x++;
-				while (code < 7 && getPos(grid, x, y) !== DEEP_SEA &&
-							 getPos(grid, x, y) !== getPos(grid, x + 1, y)) { code++; x++; }
+				while (code < 7 && get_pos(grid, x, y) !== DEEP_SEA &&
+							 get_pos(grid, x, y) !== get_pos(grid, x + 1, y)) { code++; x++; }
 				nibs.push(code);
-				while (ds < x) nibs.push(getPos(grid, ds++, y));
+				while (ds < x) nibs.push(get_pos(grid, ds++, y));
 			}
-			terrain = getPos(grid, x, y);
+			terrain = get_pos(grid, x, y);
 		}
 	}
 
-	const data = [];
+	let data = [];
 	for (let i = 0; i < nibs.length; i += 2) {
 		data.push((nibs[i] << 4) | ((i + 1 < nibs.length ? nibs[i + 1] : 0) & 0x0f));
 	}
-	const header = [4 + data.length, y & 0xff, startx & 0xff, x & 0xff];
+	let header = [4 + data.length, y & 0xff, startx & 0xff, x & 0xff];
 	return { bytes: header.concat(data), x, y };
 }
 
-function serializeMap(map) {
-	const out = [];
-	for (let i = 0; i < 8; i++) out.push('BMAPBOLO'.charCodeAt(i));
+function serialize_map(map) {
+	let out = [];
+	for (let i = 0; i < 8; i++) out.push("BMAPBOLO".charCodeAt(i));
 	out.push(1, map.pills.length, map.bases.length, map.starts.length);
 	/* WinBolo saves NEUTRAL as 16 (players are 0-15); the classic spec and
 	 * nearly every map in the wild use 0xff. Normalise on save. */
-	const owner = o => o === 16 ? 0xff : o;
-	for (const p of map.pills) out.push(p.x, p.y, owner(p.owner), p.armour, p.speed);
-	for (const b of map.bases) out.push(b.x, b.y, owner(b.owner), b.armour, b.shells, b.mines);
-	for (const s of map.starts) out.push(s.x, s.y, s.dir);
+	let owner = o => o === 16 ? 0xff : o;
+	for (let p of map.pills) out.push(p.x, p.y, owner(p.owner), p.armour, p.speed);
+	for (let b of map.bases) out.push(b.x, b.y, owner(b.owner), b.armour, b.shells, b.mines);
+	for (let s of map.starts) out.push(s.x, s.y, s.dir);
 
 	let x = 0, y = 0;
 	while (y < 0xff) {
-		const run = prepareRun(map.grid, x, y);
+		let run = prepare_run(map.grid, x, y);
 		out.push(...run.bytes);
 		x = run.x;
 		y = run.y;
@@ -211,10 +211,10 @@ function serializeMap(map) {
 
 const BoloMap = {
 	MAP_SIZE, DEEP_SEA, TERRAIN_NAMES, MAX_PILLS, MAX_BASES, MAX_STARTS,
-	EDGE_MIN, EDGE_MAX, newMap, parseMap, serializeMap, getPos,
+	EDGE_MIN, EDGE_MAX, new_map, parse_map, serialize_map, get_pos,
 };
 
-if (typeof module !== 'undefined' && module.exports) {
+if (typeof module !== "undefined" && module.exports) {
 	module.exports = BoloMap;
 } else {
 	window.BoloMap = BoloMap;
