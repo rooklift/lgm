@@ -191,10 +191,12 @@ ipcMain.handle("save-map", async (e, file_path, data) => {
 	if (!p) {
 		let res = await dialog.showSaveDialog(win, {
 			filters: MAP_FILTERS,
-			defaultPath: "untitled.map",
+			defaultPath: typeof settings.lastOpenDir === "string" ? path.join(settings.lastOpenDir, "untitled.map") : "untitled.map",
 		});
 		if (res.canceled) return { canceled: true };
 		p = res.filePath;
+		settings.lastOpenDir = path.dirname(p);
+		save_settings();
 	}
 	/* Overwrite in place, so the destination keeps its file identity —
 		 writing a temp file and renaming it over p makes a new directory
