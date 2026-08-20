@@ -59,8 +59,8 @@ let tool = "paint";
 let terrain = 7; /* grass */
 let brush_size = 1;
 let selected = null; /* {type, index} */
-let show_pill_range = false;
-let bases_as_circles = false;
+let show_pill_range = true;
+let bases_as_circles = true;
 let show_sprites = true; /* real tile art at sprite-capable zooms (View menu) */
 let sym_mode = null; /* null | "h" | "v" | "quad" | "rot180" | "rot90" */
 let sym_parity = { x: "odd", y: "odd" }; /* "odd": axis through tile 128; "even": between 127 and 128 */
@@ -1584,9 +1584,10 @@ api.on_load_map(({ path, data }) => file_op(() => load_from_bytes(data, path)));
 /* saved settings, pushed by main on every page load; later menu toggles
  * arrive as menu-cmd and are mirrored into main's settings.json there */
 api.on_settings(s => {
-	show_pill_range = !!s.showPillRange;
-	bases_as_circles = !!s.basesAsCircles;
-	show_sprites = s.showSprites !== false; /* default on */
+	/* all three default on: only an explicitly saved false turns one off */
+	show_pill_range = s.showPillRange !== false;
+	bases_as_circles = s.basesAsCircles !== false;
+	show_sprites = s.showSprites !== false;
 	request_draw();
 });
 
