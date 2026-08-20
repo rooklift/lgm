@@ -165,12 +165,16 @@ function create_window() {
 }
 
 ipcMain.handle("open-map", async () => {
-	let res = await dialog.showOpenDialog(win, {
+	let opts = {
 		filters: MAP_FILTERS,
 		properties: ["openFile"],
-	});
+	};
+	if (typeof settings.lastOpenDir === "string") opts.defaultPath = settings.lastOpenDir;
+	let res = await dialog.showOpenDialog(win, opts);
 	if (res.canceled || res.filePaths.length === 0) return { canceled: true };
 	let p = res.filePaths[0];
+	settings.lastOpenDir = path.dirname(p);
+	save_settings();
 	try {
 		let size = fs.statSync(p).size;
 		if (size > MAX_MAP_BYTES) {
