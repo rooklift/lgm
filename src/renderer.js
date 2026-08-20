@@ -61,6 +61,7 @@ let brush_size = 1;
 let selected = null; /* {type, index} */
 let show_pill_range = false;
 let bases_as_circles = false;
+let show_sprites = true; /* real tile art at sprite-capable zooms (View menu) */
 let sym_mode = null; /* null | "h" | "v" | "quad" | "rot180" | "rot90" */
 let sym_parity = { x: "odd", y: "odd" }; /* "odd": axis through tile 128; "even": between 127 and 128 */
 
@@ -259,6 +260,13 @@ function draw() {
 	ctx.imageSmoothingEnabled = false;
 	ctx.drawImage(off, view.ox, view.oy, w / z, h / z, 0, 0, w, h);
 
+	/* real WinBolo tile art at high zoom, painted over the flat-colour
+	 * underlay (which shows through until the atlas finishes loading) */
+	let sprites_drawn = false;
+	if (show_sprites && z >= BoloSprites.MIN_ZOOM) {
+		sprites_drawn = BoloSprites.draw_view(ctx, doc.grid, view, w, h);
+	}
+
 	/* darken the strip WinBolo won't save (outside 21..235) */
 	let rx0 = tile_to_screen_x(RGN_LO), ry0 = tile_to_screen_y(RGN_LO);
 	let rx1 = tile_to_screen_x(RGN_HI), ry1 = tile_to_screen_y(RGN_HI);
@@ -279,8 +287,9 @@ function draw() {
 	let tx1 = Math.min(MAP_SIZE, Math.ceil(view.ox + w / z));
 	let ty1 = Math.min(MAP_SIZE, Math.ceil(view.oy + h / z));
 
-	/* mine dots — the sole mine indicator, so drawn at every zoom */
-	{
+	/* mine dots — the mine indicator at every zoom, except when sprite mode
+	 * has already drawn the real mine graphic on each mined tile */
+	if (!sprites_drawn) {
 		let r = Math.max(0.5, z * 0.28);
 		ctx.fillStyle = "#ff3b30";
 		ctx.strokeStyle = "#7a0000";
@@ -1577,6 +1586,7 @@ api.on_load_map(({ path, data }) => file_op(() => load_from_bytes(data, path)));
 api.on_settings(s => {
 	show_pill_range = !!s.showPillRange;
 	bases_as_circles = !!s.basesAsCircles;
+	show_sprites = s.showSprites !== false; /* default on */
 	request_draw();
 });
 
@@ -1659,6 +1669,7 @@ api.on_menu(cmd => {
 		case "pill-speeds": cmd_pill_speeds(); break;
 		case "apply-all-fixes": cmd_apply_all_fixes(); break;
 		case "apply-all-fixes-slow": cmd_apply_all_fixes({ speed: 100 }); break;
+		case "toggle-sprites": show_sprites = !show_sprites; request_draw(); break;
 		case "toggle-pill-range": show_pill_range = !show_pill_range; request_draw(); break;
 		case "toggle-base-circles": bases_as_circles = !bases_as_circles; request_draw(); break;
 		case "zoom-in": zoom_step(1); break;
@@ -1679,6 +1690,7 @@ function resize() {
 }
 new ResizeObserver(resize).observe(canvas);
 
+BoloSprites.load(request_draw); /* async; sprite zooms redraw once ready */
 build_palette();
 rebuild_offscreen();
 update_counts();

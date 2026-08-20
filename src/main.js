@@ -102,6 +102,7 @@ function build_menu() {
 				{ label: "Zoom out", accelerator: "CmdOrCtrl+-", click: () => send("zoom-out") },
 				{ label: "Fit map", accelerator: "CmdOrCtrl+0", click: () => send("zoom-fit") },
 				{ type: "separator" },
+				{ label: "Terrain sprites when zoomed in", type: "checkbox", checked: settings.showSprites !== false, click: item => toggle_setting("showSprites", item, "toggle-sprites") },
 				{ label: "Show pillbox range", type: "checkbox", checked: !!settings.showPillRange, click: item => toggle_setting("showPillRange", item, "toggle-pill-range") },
 				{ label: "Draw bases as circles", type: "checkbox", checked: !!settings.basesAsCircles, click: item => toggle_setting("basesAsCircles", item, "toggle-base-circles") },
 				{ type: "separator" },
