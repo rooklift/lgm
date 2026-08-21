@@ -229,8 +229,12 @@ function spawns_symmetric(map, mode, S, T) {
  * removing the strays).
  *
  * Returns { flaws, mode, parity, S, T, per_mode } or null for an empty
- * map (S and T are the winning mirror sums, for find_flaw). */
-function score(map) {
+ * map (S and T are the winning mirror sums, for find_flaw).
+ *
+ * With fixed = { mode, S, T }, only that mode about those axes is judged
+ * (the caller's live symmetry setting rather than the best available),
+ * and per_mode holds just that one entry. */
+function score(map, fixed) {
 	let b = content_box(map);
 	if (!b) return null;
 	let S0 = b.min_x + b.max_x, T0 = b.min_y + b.max_y;
@@ -306,10 +310,11 @@ function score(map) {
 
 	let per_mode = {};
 	let best = null;
-	for (let mode of ["quad", "rot90", "h", "v", "rot180"]) {
+	for (let mode of fixed ? [fixed.mode] : ["quad", "rot90", "h", "v", "rot180"]) {
 		let m = Infinity;
 		let Ss = mode === "v" ? [S0] : Sc;
 		let Ts = mode === "h" ? [T0] : Tc;
+		if (fixed) { Ss = [fixed.S]; Ts = [fixed.T]; }
 		for (let S of Ss) {
 			for (let T of Ts) {
 				if (mode === "rot90" && (S + T) % 2 !== 0) continue;
@@ -343,9 +348,12 @@ function score(map) {
  * (missing: true) — matching whichever fix object_cost priced.
  * Returns score()'s result plus a flaw field { x, y, kind, missing }
  * with kind "terrain"|"pill"|"base" (flaw is null when the map is
- * perfect), or null for an empty map. */
-function find_flaw(map) {
-	let s = score(map);
+ * perfect), or null for an empty map.
+ *
+ * fixed is passed through to score(): with it, the flaw is judged under
+ * the given mode about the given axes instead of the best available. */
+function find_flaw(map, fixed) {
+	let s = score(map, fixed);
 	if (!s || s.flaws === 0) return s && { ...s, flaw: null };
 	let tf = group_about(s.mode, s.S, s.T);
 

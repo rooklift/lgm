@@ -91,8 +91,11 @@ function build_menu() {
 			label: "&Queries",
 			submenu: [
 				{ label: "Count symmetry flaws", click: () => send("count-flaws") },
-				{ label: "Find a symmetry flaw", click: () => send("find-flaw") },
+				{ label: "Find a flaw (best symmetry)", click: () => send("find-flaw") },
+				{ label: "Find a flaw (selected symmetry)", click: () => send("find-flaw-selected") },
+				{ type: "separator" },
 				{ label: "Pillbox speeds", click: () => send("pill-speeds") },
+				{ label: "Count non-standard objects", click: () => send("count-nonstandard") },
 			],
 		},
 		{

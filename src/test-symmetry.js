@@ -298,6 +298,43 @@ check(r2.dir(0) === 8 && r2.dir(4) === 12, "R2 dir: E->W, N->S");
 	check(BoloSym.score(m).flaws === 0, "find_flaw: repairing the named tile perfects the map");
 }
 
+/* fixed-mode scoring: judge one given mode about given axes (the
+ * editor's live symmetry setting) instead of the best available. */
+{
+	let blank = () => ({ grid: new Uint8Array(256 * 256).fill(0xff), pills: [], bases: [], starts: [] });
+	let put = (m, x, y, t) => { m.grid[y * 256 + x] = t; };
+
+	/* h-symmetric about the board's odd axis, but not v-symmetric */
+	let m = blank();
+	[[100, 100], [156, 100], [128, 90]].forEach(([x, y]) => put(m, x, y, 7));
+	let s = BoloSym.score(m, { mode: "h", S: 256, T: 256 });
+	check(s && s.flaws === 0 && s.mode === "h", "score fixed: perfect under the chosen mode is 0");
+	check(Object.keys(s.per_mode).length === 1 && s.per_mode.h === 0,
+		"score fixed: per_mode holds just the fixed mode");
+	s = BoloSym.score(m, { mode: "v", S: 256, T: 256 });
+	check(s && s.flaws > 0 && s.mode === "v", "score fixed: same map flawed under the other mode");
+	let f = BoloSym.find_flaw(m, { mode: "v", S: 256, T: 256 });
+	check(f && f.flaw && f.flaw.kind === "terrain", "find_flaw fixed: names a tile under the fixed mode");
+
+	/* fixing the named flaws under the fixed mode (copying each flawed
+	 * tile's mirror image, y -> T - y) drives its score to 0 */
+	let steps = 0;
+	while (f.flaw && steps < 20) {
+		put(m, f.flaw.x, f.flaw.y, m.grid[(256 - f.flaw.y) * 256 + f.flaw.x]);
+		f = BoloSym.find_flaw(m, { mode: "v", S: 256, T: 256 });
+		steps++;
+	}
+	check(f && f.flaws === 0, "find_flaw fixed: repairing named tiles perfects the fixed mode");
+
+	/* fixed axes are honoured: an off-centre perfect quad is flawless
+	 * about its own axes but not about the board's */
+	m = blank();
+	[[60, 60], [96, 60], [60, 96], [96, 96]].forEach(([x, y]) => put(m, x, y, 7));
+	check(BoloSym.score(m).flaws === 0, "score: off-centre quad perfect about its own axes");
+	s = BoloSym.score(m, { mode: "quad", S: 256, T: 256 });
+	check(s && s.flaws > 0, "score fixed: off-centre quad flawed about the board's axes");
+}
+
 if (failures === 0) {
 	console.log("symmetry tests: PASS");
 } else {

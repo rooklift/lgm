@@ -36,3 +36,20 @@ if (out.length === orig.length && out.every((b, i) => b === orig[i])) {
 	console.log(`semantic round trip (grid ${grids_equal ? "equal" : "DIFFERS"}, objects ${objs_equal ? "equal" : "DIFFER"}): ${grids_equal && objs_equal ? "PASS" : "FAIL"}`);
 	process.exitCode = grids_equal && objs_equal ? 0 : 1;
 }
+
+/* Owner 16 (WinBolo's alternate NEUTRAL) is normalised to 0xff on load. */
+{
+	let bytes = [];
+	for (let i = 0; i < 8; i++) bytes.push("BMAPBOLO".charCodeAt(i));
+	bytes.push(1, 1, 1, 0);               /* version, 1 pill, 1 base, 0 starts */
+	bytes.push(100, 100, 16, 15, 50);     /* pill, owner 16 */
+	bytes.push(110, 110, 16, 90, 90, 90); /* base, owner 16 */
+	bytes.push(4, 0xff, 0xff, 0xff);      /* terminator run */
+	let m = BoloMap.parse_map(Uint8Array.from(bytes));
+	if (m.pills[0].owner === 255 && m.bases[0].owner === 255) {
+		console.log("owner-16 neutral normalised on load: PASS");
+	} else {
+		console.log(`owner-16 neutral NOT normalised (pill ${m.pills[0].owner}, base ${m.bases[0].owner}): FAIL`);
+		process.exitCode = 1;
+	}
+}

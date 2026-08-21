@@ -829,7 +829,22 @@ function cmd_symmetry_score() {
 /* On demand: locate one concrete flaw — a tile the best mode would
  * edit — and name it in the status bar. */
 function cmd_find_flaw() {
-	let s = BoloSym.find_flaw(doc);
+	report_flaw(BoloSym.find_flaw(doc));
+}
+
+/* On demand: the same, but judged as the selected symmetry mode about
+ * the editor's own axes, rather than whichever mode scores best. */
+function cmd_find_flaw_selected() {
+	if (!sym_mode) {
+		status_msg("symmetry is off — select a mode first");
+		return;
+	}
+	let S = sym_parity.x === "even" ? 255 : 256;
+	let T = sym_parity.y === "even" ? 255 : 256;
+	report_flaw(BoloSym.find_flaw(doc, { mode: sym_mode, S, T }));
+}
+
+function report_flaw(s) {
 	if (!s) {
 		status_msg("empty map — nothing to check");
 		return;
@@ -872,6 +887,26 @@ function cmd_pill_speeds() {
 	status_msg(`speeds: ${parts}`, 6000);
 }
 
+/* On demand: count pillboxes and bases with any non-default property —
+ * non-neutral ownership included. Pillbox speed 100 counts as default
+ * alongside 50 (the two standard speeds). */
+function cmd_count_nonstandard() {
+	let deviates = (type, o) => OBJECT_FIELDS[type].some(([field]) => {
+		if (type === "pill" && field === "speed") return o.speed !== 50 && o.speed !== 100;
+		return o[field] !== OBJECT_DEFAULTS[type][field];
+	});
+	let pills = doc.pills.filter(o => deviates("pill", o)).length;
+	let bases = doc.bases.filter(o => deviates("base", o)).length;
+	if (pills === 0 && bases === 0) {
+		status_msg("no non-standard objects — every pillbox and base is default", 5000);
+		return;
+	}
+	let parts = [];
+	if (pills > 0) parts.push(`${pills} pillbox${pills === 1 ? "" : "es"}`);
+	if (bases > 0) parts.push(`${bases} base${bases === 1 ? "" : "s"}`);
+	status_msg(`non-standard objects: ${pills + bases} (${parts.join(", ")})`, 6000);
+}
+
 /* Manual axis-parity override (sets both axes; recentres to match). */
 function set_parity(p) {
 	if (!sym_mode) return;
@@ -906,25 +941,7 @@ function render_props() {
 	h.textContent = `${OBJECT_LABEL[selected.type]} #${selected.index + 1} at (${o.x}, ${o.y})`;
 	props_el.appendChild(h);
 
-	if (selected.type === "pill" || selected.type === "base") {
-		let row = document.createElement("div");
-		row.className = "row";
-		let label = document.createElement("span");
-		label.textContent = "terrain under";
-		let val = document.createElement("span");
-		val.textContent = TERRAIN_NAMES[doc.grid[o.y * MAP_SIZE + o.x]];
-		row.appendChild(label);
-		row.appendChild(val);
-		props_el.appendChild(row);
-	}
-
-	/* Dormant: pill/base stat editors. We deliberately don't expose these
-	 * knobs — non-default values loaded from disk survive saves untouched,
-	 * and the reset fixes in the menu normalize them on request. Only the
-	 * spawn's dir stays editable. To revive, iterate
-	 * OBJECT_FIELDS[selected.type] unconditionally. */
-	let fields = selected.type === "start" ? OBJECT_FIELDS[selected.type] : [];
-	for (let [field, min, max] of fields) {
+	for (let [field, min, max] of OBJECT_FIELDS[selected.type]) {
 		let row = document.createElement("label");
 		row.className = "row";
 		let span = document.createElement("span");
@@ -939,41 +956,38 @@ function render_props() {
 			if (!Number.isFinite(v)) v = o[field];
 			v = Math.max(min, Math.min(max, v));
 			input.value = v;
-			/* Symmetry: a committed direction carries to the spawns on the mirror
-			 * tiles, each turned by its own transform. Tolerant like
+			/* Symmetry: a committed value carries to the same-type objects on
+			 * the mirror tiles — a direction turned by each tile's own
+			 * transform, every other field copied verbatim. Tolerant like
 			 * delete_selected — mirrors that don't exist (or were moved off their
 			 * tile) are simply skipped. Only pairs that actually change are
 			 * collected, so a re-commit of the same value stays a no-op while a
 			 * commit that only fixes stale mirrors still counts as an edit. */
 			let mirrors = [];
-			if (selected.type === "start" && field === "dir") {
-				for (let m of sym_orbit(o.x, o.y).slice(1)) {
-					let idx = object_at("start", m.x, m.y);
-					if (idx < 0 || idx === selected.index) continue;
-					let mo = doc.starts[idx];
-					let md = m.dir(v);
-					if (mo.dir !== md) mirrors.push({ o: mo, dir: md });
-				}
+			for (let m of sym_orbit(o.x, o.y).slice(1)) {
+				let idx = object_at(selected.type, m.x, m.y);
+				if (idx < 0 || idx === selected.index) continue;
+				let mo = doc[OBJECT_LIST[selected.type]][idx];
+				let mv = field === "dir" ? m.dir(v) : v;
+				if (mo[field] !== mv) mirrors.push({ o: mo, v: mv });
 			}
 			if (o[field] === v && !mirrors.length) return;
 			push_undo();
 			o[field] = v;
-			for (let m of mirrors) m.o.dir = m.dir;
+			for (let m of mirrors) m.o[field] = m.v;
 			set_dirty(true);
 			request_draw();
 			if (mirrors.length) {
-				status_msg(`direction mirrored to ${mirrors.length} spawn point${mirrors.length === 1 ? "" : "s"}`);
+				let noun = mirrors.length === 1
+					? OBJECT_LABEL[selected.type] : OBJECT_LABEL_PLURAL[selected.type];
+				let what = field === "dir" ? "direction" : field;
+				status_msg(`${what} mirrored to ${mirrors.length} ${noun}`);
 			}
 		});
 		row.appendChild(span);
 		row.appendChild(input);
 		props_el.appendChild(row);
 	}
-
-	let del = document.createElement("button");
-	del.textContent = "Delete";
-	del.addEventListener("click", delete_selected);
-	props_el.appendChild(del);
 }
 
 /* ---------- palette / tools UI ---------- */
@@ -1192,7 +1206,6 @@ canvas.addEventListener("pointermove", e => {
  * so a gesture can't stay live after the OS or a focus change eats the
  * pointerup (which would let bare hover keep painting or dragging). */
 function end_gesture() {
-	if (painting && selected) render_props(); /* refresh "terrain under" readout */
 	painting = false;
 	last_tile = null;
 	paint_snap = null;
@@ -1667,7 +1680,9 @@ api.on_menu(cmd => {
 		case "buffer-sea": cmd_buffer_sea(); break;
 		case "count-flaws": cmd_symmetry_score(); break;
 		case "find-flaw": cmd_find_flaw(); break;
+		case "find-flaw-selected": cmd_find_flaw_selected(); break;
 		case "pill-speeds": cmd_pill_speeds(); break;
+		case "count-nonstandard": cmd_count_nonstandard(); break;
 		case "apply-all-fixes": cmd_apply_all_fixes(); break;
 		case "apply-all-fixes-slow": cmd_apply_all_fixes({ speed: 100 }); break;
 		case "toggle-sprites": show_sprites = !show_sprites; request_draw(); break;
