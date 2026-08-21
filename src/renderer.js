@@ -1683,7 +1683,7 @@ api.on_menu(cmd => {
 		case "fix-pill-order": cmd_fix_order("pills", "pillboxes", STATUS_SLOTS); break;
 		case "fix-start-order": cmd_fix_order("starts", "spawns", SPAWN_SLOTS); break;
 		case "fix-start-dirs": cmd_fix_spawn_dirs(); break;
-		case "reset-pills": cmd_reset_objects("pill", "pillboxes"); break;
+		case "reset-pills-fast": cmd_reset_objects("pill", "pillboxes", false, { speed: 50 }); break;
 		case "reset-pills-slow": cmd_reset_objects("pill", "pillboxes", false, { speed: 100 }); break;
 		case "reset-bases": cmd_reset_objects("base", "bases"); break;
 		case "buffer-sea": cmd_buffer_sea(); break;
@@ -1692,7 +1692,7 @@ api.on_menu(cmd => {
 		case "find-flaw-selected": cmd_find_flaw_selected(); break;
 		case "pill-speeds": cmd_pill_speeds(); break;
 		case "count-nonstandard": cmd_count_nonstandard(); break;
-		case "apply-all-fixes": cmd_apply_all_fixes(); break;
+		case "apply-all-fixes-fast": cmd_apply_all_fixes({ speed: 50 }); break;
 		case "apply-all-fixes-slow": cmd_apply_all_fixes({ speed: 100 }); break;
 		case "toggle-sprites": show_sprites = !show_sprites; request_draw(); break;
 		case "toggle-pill-range": show_pill_range = !show_pill_range; request_draw(); break;
