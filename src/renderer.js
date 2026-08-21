@@ -39,7 +39,7 @@ for (let t = 10; t <= 15; t++) RGB[t] = RGB[t - 8];
 /* Owners are 0-16 with 16 = neutral (the codec maps the file's 0xff
  * form to and from 16), so the editable range has no holes. */
 const OBJECT_DEFAULTS = {
-	pill:  { owner: 16, armour: 15, speed: 50 },
+	pill:  { owner: 16, armour: 15, speed: 100 },
 	base:  { owner: 16, armour: 90, shells: 90, mines: 90 },
 	start: { dir: 0 },
 };
