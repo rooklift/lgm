@@ -116,10 +116,17 @@ function build_menu() {
 	Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-/* A .map file given on the command line (e.g. `electron . islands.map`) */
+/* A map file given on the command line (e.g. `electron . islands.map`, or a
+ * file dropped onto the exe, which arrives as an argument). Maps in the wild
+ * don't reliably have a .map extension, so any existing regular file counts;
+ * the size ceiling and the parser sort out the rest. Flags and the app dir
+ * in dev mode (`electron .`) are skipped. */
 function find_cli_map() {
 	for (let arg of process.argv.slice(1)) {
-		if (/\.map$/i.test(arg) && fs.existsSync(arg)) return path.resolve(arg);
+		if (arg.startsWith("-")) continue;
+		try {
+			if (fs.statSync(arg).isFile()) return path.resolve(arg);
+		} catch { /* not a real path: some other kind of argument */ }
 	}
 	return null;
 }
