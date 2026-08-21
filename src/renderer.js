@@ -954,8 +954,8 @@ function render_props() {
 		let row = document.createElement("label");
 		row.className = "row";
 		let span = document.createElement("span");
-		span.textContent = field === "owner" ? "owner (16=neutral)"
-										 : field === "dir" ? "dir (0=E, counter-cw)"
+		span.textContent = field === "owner" ? "owner (16 = neutral)"
+										 : field === "dir" ? "dir (0 = east)"
 										 : field;
 		let input = document.createElement("input");
 		input.type = "number";
