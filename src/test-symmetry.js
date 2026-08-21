@@ -134,7 +134,7 @@ check(r2.dir(0) === 8 && r2.dir(4) === 12, "R2 dir: E->W, N->S");
 {
 	let blank = () => ({ grid: new Uint8Array(256 * 256).fill(0xff), pills: [], bases: [], starts: [] });
 	let put = (m, x, y, t) => { m.grid[y * 256 + x] = t; };
-	const P = (x, y) => ({ x, y, owner: 255, armour: 15, speed: 50 });
+	const P = (x, y) => ({ x, y, owner: 16, armour: 15, speed: 50 });
 
 	let m = blank();
 	[[100, 100], [156, 100], [128, 90]].forEach(([x, y]) => put(m, x, y, 7));
@@ -184,7 +184,7 @@ check(r2.dir(0) === 8 && r2.dir(4) === 12, "R2 dir: E->W, N->S");
 {
 	let blank = () => ({ grid: new Uint8Array(256 * 256).fill(0xff), pills: [], bases: [], starts: [] });
 	let put = (m, x, y, t) => { m.grid[y * 256 + x] = t; };
-	const P = (x, y) => ({ x, y, owner: 255, armour: 15, speed: 50 });
+	const P = (x, y) => ({ x, y, owner: 16, armour: 15, speed: 50 });
 	const QUAD4 = [[100, 100], [156, 100], [100, 156], [156, 156]];
 
 	check(BoloSym.score(blank()) === null, "score: empty map is null");
@@ -258,7 +258,7 @@ check(r2.dir(0) === 8 && r2.dir(4) === 12, "R2 dir: E->W, N->S");
 {
 	let blank = () => ({ grid: new Uint8Array(256 * 256).fill(0xff), pills: [], bases: [], starts: [] });
 	let put = (m, x, y, t) => { m.grid[y * 256 + x] = t; };
-	const P = (x, y) => ({ x, y, owner: 255, armour: 15, speed: 50 });
+	const P = (x, y) => ({ x, y, owner: 16, armour: 15, speed: 50 });
 	const QUAD4 = [[100, 100], [156, 100], [100, 156], [156, 156]];
 
 	check(BoloSym.find_flaw(blank()) === null, "find_flaw: empty map is null");

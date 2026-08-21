@@ -28,28 +28,34 @@ if (out.length === orig.length && out.every((b, i) => b === orig[i])) {
 	/* Fall back to semantic comparison */
 	let re = BoloMap.parse_map(out);
 	let grids_equal = re.grid.every((t, i) => t === map.grid[i]);
-	/* serialize_map normalises WinBolo's neutral owner (16) to 0xff, so the
-	 * original must be normalised the same way before comparing. */
-	let norm = list => list.map(o => ({ ...o, owner: o.owner === 16 ? 255 : o.owner }));
+	/* parse_map normalises owners (anything above 15 loads as neutral 16),
+	 * so both sides are already in the same form. */
 	let objs_equal = JSON.stringify([re.pills, re.bases, re.starts]) ===
-										JSON.stringify([norm(map.pills), norm(map.bases), map.starts]);
+										JSON.stringify([map.pills, map.bases, map.starts]);
 	console.log(`semantic round trip (grid ${grids_equal ? "equal" : "DIFFERS"}, objects ${objs_equal ? "equal" : "DIFFER"}): ${grids_equal && objs_equal ? "PASS" : "FAIL"}`);
 	process.exitCode = grids_equal && objs_equal ? 0 : 1;
 }
 
-/* Owner 16 (WinBolo's alternate NEUTRAL) is normalised to 0xff on load. */
+/* Internally owners are 0-16 with 16 = neutral: loading takes any value
+ * above 15 (WinBolo's 16, the classic 0xff, junk) as 16, and saving
+ * writes neutral back out as the classic 0xff. */
 {
 	let bytes = [];
 	for (let i = 0; i < 8; i++) bytes.push("BMAPBOLO".charCodeAt(i));
-	bytes.push(1, 1, 1, 0);               /* version, 1 pill, 1 base, 0 starts */
-	bytes.push(100, 100, 16, 15, 50);     /* pill, owner 16 */
-	bytes.push(110, 110, 16, 90, 90, 90); /* base, owner 16 */
-	bytes.push(4, 0xff, 0xff, 0xff);      /* terminator run */
+	bytes.push(1, 2, 1, 0);                /* version, 2 pills, 1 base, 0 starts */
+	bytes.push(100, 100, 16, 15, 50);      /* pill, WinBolo neutral 16 */
+	bytes.push(102, 100, 200, 15, 50);     /* pill, junk owner 200 */
+	bytes.push(110, 110, 255, 90, 90, 90); /* base, classic neutral 0xff */
+	bytes.push(4, 0xff, 0xff, 0xff);       /* terminator run */
 	let m = BoloMap.parse_map(Uint8Array.from(bytes));
-	if (m.pills[0].owner === 255 && m.bases[0].owner === 255) {
-		console.log("owner-16 neutral normalised on load: PASS");
+	let loaded_ok = m.pills[0].owner === 16 && m.pills[1].owner === 16 && m.bases[0].owner === 16;
+	let out = BoloMap.serialize_map(m);
+	/* owner bytes: header is 12 bytes, pills 5 bytes each, then bases */
+	let saved_ok = out[14] === 255 && out[19] === 255 && out[24] === 255;
+	if (loaded_ok && saved_ok) {
+		console.log("neutral owner normalisation (loads as 16, saves as 0xff): PASS");
 	} else {
-		console.log(`owner-16 neutral NOT normalised (pill ${m.pills[0].owner}, base ${m.bases[0].owner}): FAIL`);
+		console.log(`neutral owner normalisation FAIL (loaded ${m.pills[0].owner}/${m.pills[1].owner}/${m.bases[0].owner}, saved ${out[14]}/${out[19]}/${out[24]})`);
 		process.exitCode = 1;
 	}
 }

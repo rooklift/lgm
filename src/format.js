@@ -81,10 +81,10 @@ function parse_map(bytes) {
 		if (p + n > bytes.length) throw new Error("Unexpected end of file");
 	};
 
-	/* WinBolo saves NEUTRAL as 16 (players are 0-15); the classic spec and
-	 * nearly every map in the wild use 0xff. Normalise on load so the
-	 * editor only ever sees 0xff. */
-	let owner = o => o === 16 ? 0xff : o;
+	/* Internally owners are 0-16 with 16 = NEUTRAL (WinBolo's own
+	 * convention; players are 0-15). Files in the wild store neutral as
+	 * 16 or as the classic 0xff — take anything above 15 as neutral. */
+	let owner = o => o > 15 ? 16 : o;
 	let pills = [];
 	for (let i = 0; i < n_pills; i++) {
 		need(5);
@@ -196,10 +196,9 @@ function serialize_map(map) {
 	let out = [];
 	for (let i = 0; i < 8; i++) out.push("BMAPBOLO".charCodeAt(i));
 	out.push(1, map.pills.length, map.bases.length, map.starts.length);
-	/* Loading already normalises the WinBolo NEUTRAL of 16 to 0xff, but a
-	 * 16 typed into the owner editor would still slip through — normalise
-	 * on save as well. */
-	let owner = o => o === 16 ? 0xff : o;
+	/* Internal neutral (16) goes out as the classic 0xff, which nearly
+	 * every map in the wild uses. */
+	let owner = o => o >= 16 ? 0xff : o;
 	for (let p of map.pills) out.push(p.x, p.y, owner(p.owner), p.armour, p.speed);
 	for (let b of map.bases) out.push(b.x, b.y, owner(b.owner), b.armour, b.shells, b.mines);
 	for (let s of map.starts) out.push(s.x, s.y, s.dir);

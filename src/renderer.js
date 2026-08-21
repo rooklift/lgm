@@ -36,14 +36,16 @@ for (let t = 10; t <= 15; t++) RGB[t] = RGB[t - 8];
 	RGB[255] = [(c >> 16) & 255, (c >> 8) & 255, c & 255];
 }
 
+/* Owners are 0-16 with 16 = neutral (the codec maps the file's 0xff
+ * form to and from 16), so the editable range has no holes. */
 const OBJECT_DEFAULTS = {
-	pill:  { owner: 255, armour: 15, speed: 50 },
-	base:  { owner: 255, armour: 90, shells: 90, mines: 90 },
+	pill:  { owner: 16, armour: 15, speed: 50 },
+	base:  { owner: 16, armour: 90, shells: 90, mines: 90 },
 	start: { dir: 0 },
 };
 const OBJECT_FIELDS = {
-	pill:  [["owner", 0, 255], ["armour", 0, 15], ["speed", 0, 255]],
-	base:  [["owner", 0, 255], ["armour", 0, 90], ["shells", 0, 90], ["mines", 0, 90]],
+	pill:  [["owner", 0, 16], ["armour", 0, 15], ["speed", 0, 255]],
+	base:  [["owner", 0, 16], ["armour", 0, 90], ["shells", 0, 90], ["mines", 0, 90]],
 	start: [["dir", 0, 15]],
 };
 const OBJECT_LIST = { pill: "pills", base: "bases", start: "starts" };
@@ -952,7 +954,7 @@ function render_props() {
 		let row = document.createElement("label");
 		row.className = "row";
 		let span = document.createElement("span");
-		span.textContent = field === "owner" ? "owner (255=neutral)"
+		span.textContent = field === "owner" ? "owner (16=neutral)"
 										 : field === "dir" ? "dir (0=E, counter-cw)"
 										 : field;
 		let input = document.createElement("input");
