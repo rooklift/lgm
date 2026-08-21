@@ -400,15 +400,17 @@ function draw_object(type, index, o, r) {
 	let is_sel = selected && selected.type === type && selected.index === index;
 	ctx.lineWidth = 1.5;
 	if (type === "pill") {
-		ctx.fillStyle = "#e33";
-		ctx.strokeStyle = "#600";
+		let nonstd = non_standard("pill", o);
+		ctx.fillStyle = nonstd ? "#b07ad0" : "#e33";
+		ctx.strokeStyle = nonstd ? "#4e2a66" : "#600";
 		ctx.beginPath();
 		ctx.arc(cx, cy, r, 0, Math.PI * 2);
 		ctx.fill();
 		ctx.stroke();
 	} else if (type === "base") {
-		ctx.fillStyle = "#f0b429";
-		ctx.strokeStyle = "#7a5200";
+		let nonstd = non_standard("base", o);
+		ctx.fillStyle = nonstd ? "#fff" : "#f0b429";
+		ctx.strokeStyle = nonstd ? "#666" : "#7a5200";
 		if (bases_as_circles) {
 			ctx.beginPath();
 			ctx.arc(cx, cy, r, 0, Math.PI * 2);
@@ -558,6 +560,17 @@ function spawn_dir_toward(x, y) {
 
 function object_at(type, x, y) {
 	return doc[OBJECT_LIST[type]].findIndex(o => o.x === x && o.y === y);
+}
+
+/* Any property differing from the defaults — non-neutral ownership
+ * included; both standard pillbox speeds, 50 and 100, count as default.
+ * Such objects draw in a warning colour and are counted by the Queries
+ * menu. */
+function non_standard(type, o) {
+	return OBJECT_FIELDS[type].some(([field]) => {
+		if (type === "pill" && field === "speed") return o.speed !== 50 && o.speed !== 100;
+		return o[field] !== OBJECT_DEFAULTS[type][field];
+	});
 }
 
 /* First object of any type on this tile, as {type, index}, else null. */
@@ -887,16 +900,10 @@ function cmd_pill_speeds() {
 	status_msg(`speeds: ${parts}`, 6000);
 }
 
-/* On demand: count pillboxes and bases with any non-default property —
- * non-neutral ownership included. Pillbox speed 100 counts as default
- * alongside 50 (the two standard speeds). */
+/* On demand: count pillboxes and bases that non_standard() flags. */
 function cmd_count_nonstandard() {
-	let deviates = (type, o) => OBJECT_FIELDS[type].some(([field]) => {
-		if (type === "pill" && field === "speed") return o.speed !== 50 && o.speed !== 100;
-		return o[field] !== OBJECT_DEFAULTS[type][field];
-	});
-	let pills = doc.pills.filter(o => deviates("pill", o)).length;
-	let bases = doc.bases.filter(o => deviates("base", o)).length;
+	let pills = doc.pills.filter(o => non_standard("pill", o)).length;
+	let bases = doc.bases.filter(o => non_standard("base", o)).length;
 	if (pills === 0 && bases === 0) {
 		status_msg("no non-standard objects — every pillbox and base is default", 5000);
 		return;
