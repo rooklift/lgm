@@ -1,0 +1,9 @@
+{
+	"name": "bolo-map-previews",
+	"version": "1.0.0",
+	"description": "Flip between all the Bolo maps in a folder",
+	"main": "main.js",
+	"scripts": {
+		"start": "electron ."
+	}
+}
