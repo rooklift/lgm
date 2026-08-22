@@ -239,9 +239,10 @@ let atlas_x = new Map(); /* name -> x offset of its 16×16 cell in the atlas */
 let ready = false;
 
 /* Load every sprite into a single-row atlas canvas; on_ready fires once,
- * after the last file settles. A missing or broken file just leaves its
- * tiles on the flat-colour underlay. */
-function load(on_ready) {
+ * after the last file settles. base is the PNG directory, relative to the
+ * page. A missing or broken file just leaves its tiles on the flat-colour
+ * underlay. */
+function load(on_ready, base = "sprites/") {
 	if (atlas) return;
 	atlas = document.createElement("canvas");
 	atlas.width = NAMES.length * TILE;
@@ -262,7 +263,7 @@ function load(on_ready) {
 			settle();
 		});
 		img.addEventListener("error", settle);
-		img.src = "sprites/" + name + ".png";
+		img.src = base + name + ".png";
 	});
 }
 

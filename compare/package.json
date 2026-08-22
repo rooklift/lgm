@@ -1,0 +1,9 @@
+{
+	"name": "bolo-map-compare",
+	"version": "1.0.0",
+	"description": "Flip between ancestor/descendant Bolo maps listed in a JSON file",
+	"main": "main.js",
+	"scripts": {
+		"start": "electron ."
+	}
+}
