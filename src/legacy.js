@@ -26,13 +26,27 @@
  *   0x0a0  0xff
  *   0x0b0  0xff
  *   0x1f0  terrain: 104 x 52 squares, row-major, 2 nibbles per byte, LOW
- *          nibble first, 2702 bytes = 5404 squares: the four corner
- *          squares are not stored, so the first and last rows hold 102
- *          squares and the 50 between hold 104. Nibble codes are
+ *          nibble first, 2702 bytes = 5404 squares. Nibble codes are
  *          identical to 0.99's (0 building ... 15 mined grass). There is
  *          no deep sea; water is river.
+ *
+ * The resource is a dump of Bolo 0.95's in-memory map, written by several
+ * third-party editors (Bolo 0.96+ reads it back, as did we). Two of those
+ * editors disagreed by one byte about where the square array begins, and
+ * nothing in the header says which wrote a given file:
+ *   "Everard" phase: the four corner squares are not stored, so the first
+ *          and last rows hold 102 squares and the 50 between hold 104,
+ *          consecutively from 0x1f0. This is how Bolo 0.99 itself reads
+ *          every file (its built-in Everard Island, and its conversions of
+ *          other maps, decode this way row for row) and most surviving
+ *          maps were made for it.
+ *   "Road Island" phase: a plain 104-wide array from 0x1f0, so the last
+ *          four squares of the bottom row fall off the end of the resource.
+ *          In Bolo these maps appeared shifted two squares right with
+ *          wraparound (one square in the top row).
+ * See detect_phase for how we tell them apart.
  * Pill/base coordinates are world coordinates offset (17, 10) from the
- * stored terrain's top-left. No map in the corpus has an owned pill or
+ * stored terrain's top-left, or (19, 10) in Road Island phase files. No map in the corpus has an owned pill or
  * base, and 0.99 conversions all carry default stats, so imports use the
  * editor's defaults. There are no start positions.
  *
@@ -48,8 +62,10 @@ const LEGACY_W = 104;
 const LEGACY_H = 52;
 const ROW_BYTES = LEGACY_W / 2;
 const TERRAIN_OFFSET = 0x1f0;
-const TERRAIN_SQUARES = LEGACY_W * LEGACY_H - 4;
-const PAYLOAD_MIN = TERRAIN_OFFSET + TERRAIN_SQUARES / 2;
+const TERRAIN_NIBBLES = 5404;
+const PAYLOAD_MIN = TERRAIN_OFFSET + TERRAIN_NIBBLES / 2;
+const PHASE_EVERARD = -2; /* nibble index of square (0,0) relative to 0x1f0 */
+const PHASE_ROAD_ISLAND = 0;
 const COORD_OFFSET_X = 17;
 const COORD_OFFSET_Y = 10;
 const PLACE_X = 77;
@@ -104,24 +120,101 @@ function find_resource(fork, want_type) {
 	return null;
 }
 
-function parse_payload(p) {
+/* Terrain nibble for square (x, y) under a given phase, or DEEP_SEA where
+ * the square falls outside the stored run. */
+function square(p, phase, x, y) {
+	let n;
+	if (phase === PHASE_EVERARD) {
+		/* the four corners are not stored: rows 0 and 51 hold 102 squares */
+		if ((y === 0 || y === LEGACY_H - 1) && (x === 0 || x === LEGACY_W - 1)) return BoloMap.DEEP_SEA;
+		n = y === 0 ? x - 1 : (y === LEGACY_H - 1 ? y * LEGACY_W + x - 3 : y * LEGACY_W + x - 2);
+	} else {
+		n = y * LEGACY_W + x;
+		/* the last four squares of the bottom row fall off the end of the
+		 * resource; old maps have no deep sea, so river is the natural fill */
+		if (n >= TERRAIN_NIBBLES) return 1;
+	}
+	if (n < 0 || n >= TERRAIN_NIBBLES) return BoloMap.DEEP_SEA;
+	let b = p[TERRAIN_OFFSET + (n >> 1)];
+	return (n & 1) ? (b >> 4) : (b & 0x0f);
+}
+
+/* Phase detection. Under the wrong phase every row starts with the last
+ * two squares of the previous row, so the picture is shifted two squares
+ * with wraparound. Nothing local can tell the two apart on a map with a
+ * uniform border (water matches water either way), so the evidence is
+ * weighed in order, calibrated against maps whose correct phase is known:
+ *   1. a frame — the same uniform column at the same depth on both edges —
+ *      appears under one phase only: that phase.
+ *   2. frames under both: the better mirrored edges, leaning Everard.
+ *   3. no frame: a non-water square at the end of a row continuing into
+ *      the start of the next row is the wrap seam showing; fewer wins.
+ *   4. then edge symmetry, then Everard. */
+function edge_symmetry(p, phase) {
+	let score = 0;
+	for (let y = 1; y < LEGACY_H - 1; y++) {
+		if (square(p, phase, 0, y) === square(p, phase, LEGACY_W - 1, y)) score++;
+		if (square(p, phase, 1, y) === square(p, phase, LEGACY_W - 2, y)) score++;
+	}
+	return score;
+}
+
+function has_frame(p, phase) {
+	let majority = x => {
+		let counts = new Map();
+		for (let y = 1; y < LEGACY_H - 1; y++) {
+			let v = square(p, phase, x, y);
+			counts.set(v, (counts.get(v) || 0) + 1);
+		}
+		let best = [null, 0];
+		for (let [v, n] of counts) if (n > best[1]) best = [v, n];
+		return best;
+	};
+	for (let depth = 0; depth <= 2; depth++) {
+		let [lv, ln] = majority(depth), [rv, rn] = majority(LEGACY_W - 1 - depth);
+		if (lv === rv && ln >= 40 && rn >= 40) return true;
+	}
+	return false;
+}
+
+function land_continuity(p, phase) {
+	let score = 0;
+	for (let y = 1; y < LEGACY_H; y++) {
+		let a = square(p, phase, LEGACY_W - 1, y - 1), b = square(p, phase, 0, y);
+		if (a === b && a !== 1 && a !== 9 && a !== BoloMap.DEEP_SEA) score++;
+	}
+	return score;
+}
+
+function detect_phase(p) {
+	let E = PHASE_EVERARD, R = PHASE_ROAD_ISLAND;
+	let frame_e = has_frame(p, E), frame_r = has_frame(p, R);
+	if (frame_e !== frame_r) return frame_e ? E : R;
+	let sym_e = edge_symmetry(p, E), sym_r = edge_symmetry(p, R);
+	if (frame_e) return sym_e >= sym_r - 10 ? E : R;
+	let land_e = land_continuity(p, E), land_r = land_continuity(p, R);
+	if (Math.abs(land_e - land_r) >= 4) return land_e < land_r ? E : R;
+	if (Math.abs(sym_e - sym_r) >= 10) return sym_e > sym_r ? E : R;
+	return E;
+}
+
+function parse_payload(p, phase) {
 	if (p.length < PAYLOAD_MIN) throw new Error(`BMAP resource too short (${p.length} bytes)`);
+	if (phase === undefined) phase = detect_phase(p);
 
 	let map = BoloMap.new_map();
 	let grid = map.grid;
-	let n = 0; /* nibble index: the squares are stored consecutively, corners skipped */
 	for (let y = 0; y < LEGACY_H; y++) {
 		for (let x = 0; x < LEGACY_W; x++) {
-			let edge_row = y === 0 || y === LEGACY_H - 1;
-			if (edge_row && (x === 0 || x === LEGACY_W - 1)) continue; /* unstored corner: stays deep sea */
-			let b = p[TERRAIN_OFFSET + (n >> 1)];
-			grid[(PLACE_Y + y) * BoloMap.MAP_SIZE + PLACE_X + x] = (n & 1) ? (b >> 4) : (b & 0x0f);
-			n++;
+			grid[(PLACE_Y + y) * BoloMap.MAP_SIZE + PLACE_X + x] = square(p, phase, x, y);
 		}
 	}
 
-	let place = (x, y) => ({ x: x - COORD_OFFSET_X + PLACE_X, y: y - COORD_OFFSET_Y + PLACE_Y });
-	let in_world = (x, y) => x >= COORD_OFFSET_X && x < COORD_OFFSET_X + LEGACY_W && y >= COORD_OFFSET_Y && y < COORD_OFFSET_Y + LEGACY_H;
+	/* Road Island phase files have the whole world, entities included, two
+	 * squares to the right. */
+	let ox = phase === PHASE_ROAD_ISLAND ? COORD_OFFSET_X + 2 : COORD_OFFSET_X;
+	let place = (x, y) => ({ x: x - ox + PLACE_X, y: y - COORD_OFFSET_Y + PLACE_Y });
+	let in_world = (x, y) => x >= ox && x < ox + LEGACY_W && y >= COORD_OFFSET_Y && y < COORD_OFFSET_Y + LEGACY_H;
 
 	for (let i = 0; i < 16; i++) {
 		let x = p[0x60 + i], y = p[0x70 + i], o = p[0x90 + i];
@@ -145,7 +238,8 @@ function is_legacy_container(bytes) {
 	}
 }
 
-function parse_legacy_map(bytes) {
+/* phase: undefined to auto-detect, or PHASE_EVERARD / PHASE_ROAD_ISLAND */
+function parse_legacy_map(bytes, phase) {
 	let fork = unwrap_apple(bytes);
 	if (!fork) {
 		if (!looks_like_resource_fork(bytes)) throw new Error("Not a Bolo map (no BMAPBOLO header, and not a Mac resource fork)");
@@ -153,10 +247,19 @@ function parse_legacy_map(bytes) {
 	}
 	let payload = find_resource(fork, "BMAP");
 	if (!payload) throw new Error("Resource fork has no BMAP resource");
-	return parse_payload(payload);
+	return parse_payload(payload, phase);
 }
 
-const BoloLegacy = { is_legacy_container, parse_legacy_map, LEGACY_W, LEGACY_H, PLACE_X, PLACE_Y };
+/* Which dialect a legacy file appears to be written in (see header). */
+function legacy_phase(bytes) {
+	let fork = unwrap_apple(bytes) || bytes;
+	let payload = find_resource(fork, "BMAP");
+	if (!payload) throw new Error("Resource fork has no BMAP resource");
+	if (payload.length < PAYLOAD_MIN) throw new Error(`BMAP resource too short (${payload.length} bytes)`);
+	return detect_phase(payload);
+}
+
+const BoloLegacy = { is_legacy_container, parse_legacy_map, legacy_phase, PHASE_EVERARD, PHASE_ROAD_ISLAND, LEGACY_W, LEGACY_H, PLACE_X, PLACE_Y };
 
 if (typeof module !== "undefined" && module.exports) {
 	module.exports = BoloLegacy;
