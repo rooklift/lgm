@@ -53,6 +53,8 @@ function build_menu() {
 				{ label: "New", accelerator: "CmdOrCtrl+N", click: () => send("new") },
 				{ label: "Open…", accelerator: "CmdOrCtrl+O", click: () => send("open") },
 				{ type: "separator" },
+				{ label: "Detect shifted legacy maps", type: "checkbox", checked: settings.detectLegacyPhase !== false, click: item => toggle_setting("detectLegacyPhase", item, "toggle-legacy-phase") },
+				{ type: "separator" },
 				{ label: "Save", accelerator: "CmdOrCtrl+S", click: () => send("save") },
 				{ label: "Save as…", accelerator: "CmdOrCtrl+Shift+S", click: () => send("save-as") },
 				{ type: "separator" },

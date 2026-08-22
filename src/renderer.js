@@ -64,6 +64,9 @@ let selected = null; /* {type, index} */
 let show_pill_range = true;
 let bases_as_circles = true;
 let show_sprites = true; /* real tile art at sprite-capable zooms (View menu) */
+/* Old Mac BMAP maps come in two layouts two squares apart; off means read
+ * them all the way Bolo 0.99 did (File menu). */
+let detect_legacy_phase = true;
 let sym_mode = null; /* null | "h" | "v" | "quad" | "rot180" | "rot90" */
 let sym_parity = { x: "odd", y: "odd" }; /* "odd": axis through tile 128; "even": between 127 and 128 */
 
@@ -1582,7 +1585,7 @@ function load_from_bytes(data, path) {
 	try {
 		/* parse before swapping: a bad file loses nothing */
 		if (BoloLegacy.is_legacy_container(data)) {
-			map = BoloLegacy.parse_legacy_map(data);
+			map = BoloLegacy.parse_legacy_map(data, detect_legacy_phase ? undefined : BoloLegacy.PHASE_EVERARD);
 			/* An imported Mac resource-fork map can't be saved back in its
 			 * own format; forget the path so Save asks for a new one rather
 			 * than overwriting the original with BMAPBOLO data. */
@@ -1615,10 +1618,11 @@ api.on_load_map(({ path, data }) => file_op(() => load_from_bytes(data, path)));
 /* saved settings, pushed by main on every page load; later menu toggles
  * arrive as menu-cmd and are mirrored into main's settings.json there */
 api.on_settings(s => {
-	/* all three default on: only an explicitly saved false turns one off */
+	/* all default on: only an explicitly saved false turns one off */
 	show_pill_range = s.showPillRange !== false;
 	bases_as_circles = s.basesAsCircles !== false;
 	show_sprites = s.showSprites !== false;
+	detect_legacy_phase = s.detectLegacyPhase !== false;
 	request_draw();
 });
 
@@ -1706,6 +1710,7 @@ api.on_menu(cmd => {
 		case "toggle-sprites": show_sprites = !show_sprites; request_draw(); break;
 		case "toggle-pill-range": show_pill_range = !show_pill_range; request_draw(); break;
 		case "toggle-base-circles": bases_as_circles = !bases_as_circles; request_draw(); break;
+		case "toggle-legacy-phase": detect_legacy_phase = !detect_legacy_phase; break;
 		case "zoom-in": zoom_step(1); break;
 		case "zoom-out": zoom_step(-1); break;
 		case "zoom-fit": zoom_fit(); break;
