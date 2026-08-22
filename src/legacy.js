@@ -46,9 +46,10 @@
  *          wraparound (one square in the top row).
  * See detect_phase for how we tell them apart.
  * Pill/base coordinates are world coordinates offset (17, 10) from the
- * stored terrain's top-left, or (19, 10) in Road Island phase files. No map in the corpus has an owned pill or
- * base, and 0.99 conversions all carry default stats, so imports use the
- * editor's defaults. There are no start positions.
+ * stored terrain's top-left, or (19, 10) in Road Island phase files. No
+ * map in the corpus has an owned pill or base, and 0.99 conversions all
+ * carry default stats, so imports use the editor's defaults. There are no
+ * start positions.
  *
  * The world is dropped where Bolo 0.99 puts it: top-left at (77, 102) in
  * the 256 x 256 map, deep sea around it and in the unstored corners.
@@ -191,7 +192,7 @@ function detect_phase(p) {
 	let frame_e = has_frame(p, E), frame_r = has_frame(p, R);
 	if (frame_e !== frame_r) return frame_e ? E : R;
 	let sym_e = edge_symmetry(p, E), sym_r = edge_symmetry(p, R);
-	if (frame_e) return sym_e >= sym_r - 10 ? E : R;
+	if (frame_e) return sym_e >= sym_r - 5 ? E : R;
 	let land_e = land_continuity(p, E), land_r = land_continuity(p, R);
 	if (Math.abs(land_e - land_r) >= 4) return land_e < land_r ? E : R;
 	if (Math.abs(sym_e - sym_r) >= 10) return sym_e > sym_r ? E : R;
