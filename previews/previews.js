@@ -20,11 +20,11 @@ for (let t of Object.keys(TERRAIN_COLORS)) {
 }
 for (let t = 10; t <= 15; t++) RGB[t] = RGB[t - 8];
 
-let entries = [];   /* {pair, role, path, map, off, cx, cy} or {pair, role, path, error} */
+let entries = [];   /* {path, map, off, cx, cy} or {path, error} */
 let index = 0;
 
 /* pan, in tiles, relative to the current map's land centre — kept across
- * maps so old and new are seen from the same place */
+ * maps so successive maps are seen from the same place */
 let pan = { x: 0, y: 0 };
 let drag = null;
 
@@ -80,9 +80,7 @@ function escape_html(s) {
 }
 
 function set_header(e) {
-	let pairs = entries.length / 2;
-	let role = e.role === "old" ? `<span class="old">OLD (ancestor)</span>` : `<span class="new">NEW</span>`;
-	let line1 = `[${e.pair + 1}/${pairs}] ${role} <b>${escape_html(basename(e.path))}</b>`;
+	let line1 = `[${index + 1}/${entries.length}] <b>${escape_html(basename(e.path))}</b>`;
 	if (e.error) {
 		line1 += ` <span class="err">— ${escape_html(e.error)}</span>`;
 	} else {
@@ -180,11 +178,8 @@ function go(i) {
 
 document.addEventListener("keydown", ev => {
 	switch (ev.key) {
-		case "ArrowRight": go(index + 1); break;
-		case "ArrowLeft": go(index - 1); break;
-		case "ArrowDown": go(index + 2); break;
-		case "ArrowUp": go(index - 2); break;
-		case " ": go(index ^ 1); break;
+		case "ArrowRight": case "ArrowDown": go(index + 1); break;
+		case "ArrowLeft": case "ArrowUp": go(index - 1); break;
 		case "Home": go(0); break;
 		case "End": go(entries.length - 1); break;
 		case "c": case "C": pan = { x: 0, y: 0 }; draw(); break;

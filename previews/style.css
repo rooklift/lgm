@@ -2,8 +2,6 @@ html, body { margin: 0; height: 100%; background: #10131a; color: #ddd; font: 13
 #layout { display: flex; flex-direction: column; height: 100%; }
 #header { padding: 6px 10px; background: #1a1f2b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.4; }
 #header b { color: #fff; font-size: 15px; }
-#header .old { color: #f0b429; font-weight: bold; }
-#header .new { color: #6ec6ff; font-weight: bold; }
 #header .err { color: #f66; }
 #header .path { color: #888; }
 #view { flex: 1; display: block; min-height: 0; }
