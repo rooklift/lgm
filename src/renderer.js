@@ -1580,7 +1580,16 @@ function cmd_new() {
 function load_from_bytes(data, path) {
 	let map;
 	try {
-		map = BoloMap.parse_map(data); /* parse before swapping: a bad file loses nothing */
+		/* parse before swapping: a bad file loses nothing */
+		if (BoloLegacy.is_legacy_container(data)) {
+			map = BoloLegacy.parse_legacy_map(data);
+			/* An imported Mac resource-fork map can't be saved back in its
+			 * own format; forget the path so Save asks for a new one rather
+			 * than overwriting the original with BMAPBOLO data. */
+			path = null;
+		} else {
+			map = BoloMap.parse_map(data);
+		}
 	} catch (err) {
 		api.show_error("Could not read map", err.message);
 		return;

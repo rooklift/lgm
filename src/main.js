@@ -7,7 +7,7 @@ let win = null;
 let is_dirty = false;
 
 const MAP_FILTERS = [
-	{ name: "Bolo maps", extensions: ["map"] },
+	{ name: "Bolo maps", extensions: ["map", "rsrc"] },
 	{ name: "All files", extensions: ["*"] },
 ];
 
