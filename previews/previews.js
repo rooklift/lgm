@@ -31,6 +31,9 @@ let drag = null;
 let canvas = document.getElementById("view");
 let ctx = canvas.getContext("2d");
 let header = document.getElementById("header");
+let copy_button = document.getElementById("copy_button");
+let copy_status = document.getElementById("copy_status");
+let copy_status_timer = null;
 
 function parse(data) {
 	if (BoloLegacy.is_legacy_container(data)) return BoloLegacy.parse_legacy_map(data);
@@ -98,6 +101,7 @@ function draw() {
 	ctx.fillRect(0, 0, w, h);
 
 	let e = entries[index];
+	copy_button.disabled = !e;
 	if (!e) { header.textContent = "No maps."; return; }
 	set_header(e);
 	if (e.error) return;
@@ -198,6 +202,29 @@ window.addEventListener("mousemove", ev => {
 	draw();
 });
 window.addEventListener("mouseup", () => { drag = null; });
+
+function show_copy_status(text, is_error) {
+	copy_status.textContent = text;
+	copy_status.className = is_error ? "err" : "";
+	clearTimeout(copy_status_timer);
+	copy_status_timer = setTimeout(() => { copy_status.textContent = ""; }, 4000);
+}
+
+copy_button.addEventListener("click", async () => {
+	let e = entries[index];
+	if (!e) return;
+	copy_button.disabled = true;
+	try {
+		let result = await api.copy_to_desktop(e.path);
+		if (result.ok) {
+			show_copy_status(`Copied to ${basename(result.dst)}`, false);
+		} else {
+			show_copy_status(`Copy failed: ${result.error}`, true);
+		}
+	} finally {
+		copy_button.disabled = false;
+	}
+});
 
 window.addEventListener("resize", draw);
 

@@ -5,4 +5,10 @@ html, body { margin: 0; height: 100%; background: #10131a; color: #ddd; font: 13
 #header .err { color: #f66; }
 #header .path { color: #888; }
 #view { flex: 1; display: block; min-height: 0; }
-#hint { padding: 4px 10px; background: #1a1f2b; color: #888; }
+#hint { padding: 4px 10px; background: #1a1f2b; color: #888; display: flex; align-items: center; gap: 10px; }
+#hint span:first-child { flex: 1; }
+#copy_status { color: #8c8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 50%; }
+#copy_status.err { color: #f66; }
+#copy_button { background: #2a3140; color: #ddd; border: 1px solid #444; border-radius: 3px; padding: 2px 10px; font: inherit; cursor: pointer; }
+#copy_button:hover:enabled { background: #364058; }
+#copy_button:disabled { opacity: 0.4; cursor: default; }

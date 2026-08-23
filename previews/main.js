@@ -2,7 +2,7 @@
 /* Usage: electron . mapfolder
  * Every regular file in the folder (non-recursive, sorted by name) is read
  * here and handed to the renderer as one flat list. */
-const { app, BrowserWindow, dialog } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain } = require("electron");
 const fs = require("fs");
 const path = require("path");
 
@@ -42,6 +42,31 @@ function read_entries(dir_path) {
 	}
 	return entries;
 }
+
+/* Copies the file to the desktop, never overwriting: "foo.map", then
+ * "foo (2).map", "foo (3).map"... Returns the destination path. */
+function copy_to_desktop(src) {
+	let desktop = app.getPath("desktop");
+	let ext = path.extname(src);
+	let stem = path.basename(src, ext);
+	for (let n = 1; ; n++) {
+		let dst = path.join(desktop, n === 1 ? `${stem}${ext}` : `${stem} (${n})${ext}`);
+		try {
+			fs.copyFileSync(src, dst, fs.constants.COPYFILE_EXCL);
+			return dst;
+		} catch (err) {
+			if (err.code !== "EEXIST") throw err;
+		}
+	}
+}
+
+ipcMain.handle("copy_to_desktop", (e, src) => {
+	try {
+		return { ok: true, dst: copy_to_desktop(src) };
+	} catch (err) {
+		return { ok: false, error: String(err.message || err) };
+	}
+});
 
 function create_window() {
 	let win = new BrowserWindow({
