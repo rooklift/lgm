@@ -1305,8 +1305,48 @@ const STATUS_SLOTS = [
 	[0, 2], [1, 2], [2, 2], [3, 2], [4, 2], [5, 2],
 ];
 
-/* Spawns have no in-game status grid; order them top-to-bottom (1×16 column). */
-const SPAWN_SLOTS = Array.from({ length: 16 }, (_, i) => [0, i]);
+/* Spawns have no in-game status grid; instead, give nearby spawns nearby
+ * numbers by finding the shortest open path through all of them. Exact
+ * Held-Karp DP over (visited-set, last-spawn) states — fine for n ≤ 16. */
+function spawn_path_order(list) {
+	let n = list.length;
+	let dist = list.map(a => list.map(b => Math.hypot(a.x - b.x, a.y - b.y)));
+	let full = (1 << n) - 1;
+	let dp = new Float64Array((full + 1) * n).fill(Infinity);
+	let parent = new Int8Array((full + 1) * n).fill(-1);
+	for (let i = 0; i < n; i++) dp[(1 << i) * n + i] = 0;
+	for (let mask = 1; mask <= full; mask++) {
+		for (let i = 0; i < n; i++) {
+			if (!(mask & (1 << i))) continue;
+			let cur = dp[mask * n + i];
+			if (cur === Infinity) continue;
+			for (let j = 0; j < n; j++) {
+				if (mask & (1 << j)) continue;
+				let next = mask | (1 << j);
+				if (cur + dist[i][j] < dp[next * n + j]) {
+					dp[next * n + j] = cur + dist[i][j];
+					parent[next * n + j] = i;
+				}
+			}
+		}
+	}
+	let last = 0;
+	for (let i = 1; i < n; i++) {
+		if (dp[full * n + i] < dp[full * n + last]) last = i;
+	}
+	let path = [];
+	for (let mask = full, i = last; i !== -1; ) {
+		path.push(i);
+		let prev = parent[mask * n + i];
+		mask &= ~(1 << i);
+		i = prev;
+	}
+	path.reverse();
+	/* The path reads the same backwards; start from the end nearer the top-left. */
+	let a = list[path[0]], b = list[path[n - 1]];
+	if (b.y < a.y || (b.y === a.y && b.x < a.x)) path.reverse();
+	return path.map(i => list[i]);
+}
 
 /* Hungarian algorithm (Kuhn–Munkres with potentials), rows n ≤ cols m.
  * Returns assign[i] = column chosen for row i, minimizing total cost. */
@@ -1364,14 +1404,18 @@ function status_grid_order(list, slots) {
 	return idx.sort((a, b) => assign[a] - assign[b]).map(i => list[i]);
 }
 
+function status_grid_fn(list) {
+	return status_grid_order(list, STATUS_SLOTS);
+}
+
 /* Each cmd_* fix supports quiet mode: no undo/status/redraw (the caller
  * batches those), and returns whether anything changed. */
-function cmd_fix_order(list_name, label, slots, quiet) {
+function cmd_fix_order(list_name, label, order_fn, desc, quiet) {
 	let list = doc[list_name];
 	if (list.length < 2) return false;
-	let reordered = status_grid_order(list, slots);
+	let reordered = order_fn(list);
 	if (reordered.every((o, i) => o === list[i])) {
-		if (!quiet) status_msg(`${label} already in status-grid order`);
+		if (!quiet) status_msg(`${label} already in ${desc} order`);
 		return false;
 	}
 	if (!quiet) push_undo();
@@ -1384,7 +1428,7 @@ function cmd_fix_order(list_name, label, slots, quiet) {
 		set_dirty(true);
 		render_props();
 		request_draw();
-		status_msg(`${label} reordered to match status grid`);
+		status_msg(`${label} reordered to ${desc} order`);
 	}
 	return true;
 }
@@ -1474,9 +1518,9 @@ function cmd_buffer_sea(quiet) {
 function cmd_apply_all_fixes(pill_overrides) {
 	let snap = snapshot();
 	let changed = [
-		cmd_fix_order("pills", "pillboxes", STATUS_SLOTS, true),
-		cmd_fix_order("bases", "bases", STATUS_SLOTS, true),
-		cmd_fix_order("starts", "spawns", SPAWN_SLOTS, true),
+		cmd_fix_order("pills", "pillboxes", status_grid_fn, "status-grid", true),
+		cmd_fix_order("bases", "bases", status_grid_fn, "status-grid", true),
+		cmd_fix_order("starts", "spawns", spawn_path_order, "shortest-path", true),
 		cmd_fix_spawn_dirs(true),
 		cmd_reset_objects("pill", "pillboxes", true, pill_overrides),
 		cmd_reset_objects("base", "bases", true),
@@ -1692,9 +1736,9 @@ api.on_menu(cmd => {
 		case "save-as": cmd_save(true); break;
 		case "undo": undo(); break;
 		case "redo": redo(); break;
-		case "fix-base-order": cmd_fix_order("bases", "bases", STATUS_SLOTS); break;
-		case "fix-pill-order": cmd_fix_order("pills", "pillboxes", STATUS_SLOTS); break;
-		case "fix-start-order": cmd_fix_order("starts", "spawns", SPAWN_SLOTS); break;
+		case "fix-base-order": cmd_fix_order("bases", "bases", status_grid_fn, "status-grid"); break;
+		case "fix-pill-order": cmd_fix_order("pills", "pillboxes", status_grid_fn, "status-grid"); break;
+		case "fix-start-order": cmd_fix_order("starts", "spawns", spawn_path_order, "shortest-path"); break;
 		case "fix-start-dirs": cmd_fix_spawn_dirs(); break;
 		case "reset-pills-fast": cmd_reset_objects("pill", "pillboxes", false, { speed: 50 }); break;
 		case "reset-pills-slow": cmd_reset_objects("pill", "pillboxes", false, { speed: 100 }); break;
