@@ -172,6 +172,15 @@ function draw() {
 		ctx.stroke();
 		ctx.restore();
 	}
+
+	/* numbers in a second pass so no object can be drawn over them (as the editor) */
+	ctx.fillStyle = "#fff";
+	ctx.font = `${Math.max(8, Math.round(z * 0.6))}px sans-serif`;
+	ctx.textAlign = "center";
+	let label = (i, o) => ctx.fillText(String(i + 1), sx(o.x) + z / 2, sy(o.y) + z / 2 - r - 3);
+	for (let [i, b] of e.map.bases.entries()) label(i, b);
+	for (let [i, p] of e.map.pills.entries()) label(i, p);
+	for (let [i, s] of e.map.starts.entries()) label(i, s);
 }
 
 function go(i) {
