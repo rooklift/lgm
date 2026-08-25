@@ -511,7 +511,10 @@ function paint_line(x0, y0, x1, y1, t) {
 function flood_fill(x, y, t) {
 	if (!in_region(x, y)) return false;
 	let target = doc.grid[y * MAP_SIZE + x];
-	if (target === t) return false;
+	/* Clicking a region already of terrain t is normally a no-op, but in
+	 * symmetry mode the traversal still runs so the replication below can
+	 * force any out-of-sync mirror tiles to match. */
+	if (target === t && !sym_mode) return false;
 	let stack = [[x, y]];
 	let visited = new Uint8Array(MAP_SIZE * MAP_SIZE);
 	let filled = [];
@@ -524,9 +527,8 @@ function flood_fill(x, y, t) {
 		visited[i] = 1;
 		/* fill flows past spawn points but leaves their deep sea untouched */
 		if (t === DEEP_SEA || object_at("start", cx, cy) < 0) {
-			doc.grid[i] = t;
+			if (doc.grid[i] !== t) { doc.grid[i] = t; changed = true; }
 			filled.push(i);
-			changed = true;
 		}
 		stack.push([cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]);
 	}
