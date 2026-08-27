@@ -89,9 +89,9 @@ select, input[type="number"] {
 .swatch.active { border-color: #fff; box-shadow: 0 0 0 2px var(--accent); }
 .swatch .minedot {
 	position: absolute; top: 4px; left: 50%;
-	width: 8px; height: 8px; margin-left: -4px;
+	width: 6px; height: 6px; margin-left: -3px;
 	border-radius: 50%;
-	background: #ff3b30; border: 1px solid #7a0000;
+	background: #ffeb3b; border: 1px solid #8a7700;
 }
 
 #props .row { margin-bottom: 4px; justify-content: space-between; }

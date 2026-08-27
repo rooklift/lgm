@@ -127,8 +127,8 @@ function draw() {
 
 	/* mine dots, until the atlas supplies the real mine graphic */
 	if (!sprites_drawn) {
-		let mr = z * 0.28;
-		ctx.fillStyle = "#ff3b30";
+		let mr = z * 0.2;
+		ctx.fillStyle = "#ffeb3b";
 		for (let ty = 0; ty < MAP_SIZE; ty++) {
 			for (let tx = 0; tx < MAP_SIZE; tx++) {
 				let t = e.map.grid[ty * MAP_SIZE + tx];

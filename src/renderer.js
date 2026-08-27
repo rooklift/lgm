@@ -29,7 +29,7 @@ for (let t = 0; t <= 9; t++) {
 	let c = parseInt(TERRAIN_COLORS[t].slice(1), 16);
 	RGB[t] = [(c >> 16) & 255, (c >> 8) & 255, c & 255];
 }
-/* Mined variants share the base terrain colour; the red dot marks the mine */
+/* Mined variants share the base terrain colour; the yellow dot marks the mine */
 for (let t = 10; t <= 15; t++) RGB[t] = RGB[t - 8];
 {
 	let c = parseInt(TERRAIN_COLORS[255].slice(1), 16);
@@ -295,9 +295,9 @@ function draw() {
 	/* mine dots — the mine indicator at every zoom, except when sprite mode
 	 * has already drawn the real mine graphic on each mined tile */
 	if (!sprites_drawn) {
-		let r = Math.max(0.5, z * 0.28);
-		ctx.fillStyle = "#ff3b30";
-		ctx.strokeStyle = "#7a0000";
+		let r = Math.max(0.5, z * 0.2);
+		ctx.fillStyle = "#ffeb3b";
+		ctx.strokeStyle = "#8a7700";
 		for (let ty = ty0; ty < ty1; ty++) {
 			for (let tx = tx0; tx < tx1; tx++) {
 				let t = doc.grid[ty * MAP_SIZE + tx];
