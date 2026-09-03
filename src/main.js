@@ -75,8 +75,6 @@ function build_menu() {
 				{ label: "Fix pillbox order", click: () => send("fix-pill-order") },
 				{ label: "Fix spawn order", click: () => send("fix-start-order") },
 				{ type: "separator" },
-				{ label: "Fix spawn directions", click: () => send("fix-start-dirs") },
-				{ type: "separator" },
 				{ label: "Reset bases", click: () => send("reset-bases") },
 				{ type: "separator" },
 				{ label: "Reset pillboxes (wait 50)", click: () => send("reset-pills-fast") },
@@ -85,6 +83,7 @@ function build_menu() {
 				{ label: "Apply all fixes above (wait 50)", click: () => send("apply-all-fixes-fast") },
 				{ label: "Apply all fixes above (wait 100)", click: () => send("apply-all-fixes-slow") },
 				{ type: "separator" },
+				{ label: "Fix spawn directions", click: () => send("fix-start-dirs") },
 				{ label: "Buffer the sea", click: () => send("buffer-sea") },
 
 			],

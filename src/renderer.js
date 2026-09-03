@@ -1523,7 +1523,6 @@ function cmd_apply_all_fixes(pill_overrides) {
 		cmd_fix_order("pills", "pillboxes", status_grid_fn, "status-grid", true),
 		cmd_fix_order("bases", "bases", status_grid_fn, "status-grid", true),
 		cmd_fix_order("starts", "spawns", spawn_path_order, "shortest-path", true),
-		cmd_fix_spawn_dirs(true),
 		cmd_reset_objects("pill", "pillboxes", true, pill_overrides),
 		cmd_reset_objects("base", "bases", true),
 	].filter(Boolean).length;
