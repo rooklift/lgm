@@ -97,6 +97,8 @@ function build_menu() {
 				{ type: "separator" },
 				{ label: "Pillbox speeds", click: () => send("pill-speeds") },
 				{ label: "Count non-standard objects", click: () => send("count-nonstandard") },
+				{ type: "separator" },
+				{ label: "Count trees", click: () => send("count-trees") },
 			],
 		},
 		{
