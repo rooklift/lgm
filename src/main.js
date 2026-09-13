@@ -54,6 +54,7 @@ function build_menu() {
 				{ label: "Open…", accelerator: "CmdOrCtrl+O", click: () => send("open") },
 				{ type: "separator" },
 				{ label: "Auto-detect shifted legacy maps", type: "checkbox", checked: settings.detectLegacyPhase !== false, click: item => toggle_setting("detectLegacyPhase", item, "toggle-legacy-phase") },
+				{ label: "Strict symmetry checks", type: "checkbox", checked: settings.strict_symmetry_checks === true, click: item => toggle_setting("strict_symmetry_checks", item, "toggle-strict-symmetry-checks") },
 				{ type: "separator" },
 				{ label: "Save", accelerator: "CmdOrCtrl+S", click: () => send("save") },
 				{ label: "Save as…", accelerator: "CmdOrCtrl+Shift+S", click: () => send("save-as") },

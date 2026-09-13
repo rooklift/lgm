@@ -99,7 +99,8 @@ const SIZE = 256, DEEP_SEA = 0xff, LO = 21, HI = 236;
  *
  * Slackness, by design: spawn points are ignored entirely; object
  * properties are ignored (positions only); and terrain mismatches are
- * excused when either cell sits under any object.
+ * excused when either cell sits under any object. With strict enabled,
+ * terrain under pills and bases is checked too; spawns remain excused.
  *
  * Returns { mode, parity, bounds } or null. Preference order when
  * several modes hold: quad, rot90, h, v, rot180. */
@@ -123,7 +124,19 @@ function content_box(map) {
 	return max_x < 0 ? null : { min_x, min_y, max_x, max_y };
 }
 
-function detect(map) {
+function terrain_wildcards(map, strict) {
+	let occ = new Set(map.starts.map(o => o.y * SIZE + o.x));
+	for (let list of [map.pills, map.bases]) {
+		for (let o of list) {
+			let key = o.y * SIZE + o.x;
+			if (strict) occ.delete(key);
+			else occ.add(key);
+		}
+	}
+	return occ;
+}
+
+function detect(map, strict = false) {
 	let bounds = content_box(map);
 	if (!bounds) return null;
 	let { min_x, min_y, max_x, max_y } = bounds;
@@ -132,10 +145,7 @@ function detect(map) {
 	let S = min_x + max_x, T = min_y + max_y;
 
 	let in_reg = (x, y) => x >= LO && x < HI && y >= LO && y < HI;
-	let occ = new Set();
-	for (let list of [map.pills, map.bases, map.starts]) {
-		for (let o of list) occ.add(o.y * SIZE + o.x);
-	}
+	let occ = terrain_wildcards(map, strict);
 	let pill_set = new Set(map.pills.map(o => o.y * SIZE + o.x));
 	let base_set = new Set(map.bases.map(o => o.y * SIZE + o.x));
 
@@ -234,7 +244,7 @@ function spawns_symmetric(map, mode, S, T) {
  * With fixed = { mode, S, T }, only that mode about those axes is judged
  * (the caller's live symmetry setting rather than the best available),
  * and per_mode holds just that one entry. */
-function score(map, fixed) {
+function score(map, fixed, strict = false) {
 	let b = content_box(map);
 	if (!b) return null;
 	let S0 = b.min_x + b.max_x, T0 = b.min_y + b.max_y;
@@ -242,10 +252,7 @@ function score(map, fixed) {
 	let Tc = [...new Set([T0 - 1, T0, T0 + 1, 255, 256])];
 
 	let in_reg = (x, y) => x >= LO && x < HI && y >= LO && y < HI;
-	let occ = new Set();
-	for (let list of [map.pills, map.bases, map.starts]) {
-		for (let o of list) occ.add(o.y * SIZE + o.x);
-	}
+	let occ = terrain_wildcards(map, strict);
 	let pill_keys = new Set(map.pills.map(o => o.x + "," + o.y));
 	let base_keys = new Set(map.bases.map(o => o.x + "," + o.y));
 
@@ -287,7 +294,7 @@ function score(map, fixed) {
 					let ix = ox[i], iy = oy[i];
 					if (in_reg(ix, iy)) {
 						seen[iy * SIZE + ix] = 1;
-						/* cells under objects are wildcards */
+						/* skip terrain excused by the current check settings */
 						if (!occ.has(iy * SIZE + ix)) vals.push(map.grid[iy * SIZE + ix]);
 					} else {
 						vals.push(DEEP_SEA); /* off-region reads back as deep sea */
@@ -340,7 +347,7 @@ function score(map, fixed) {
 }
 
 /* Locate one concrete flaw: a tile that score()'s winning mode would
- * edit. Terrain first — an in-region cell, not under an object, that
+ * edit. Terrain first — an in-region cell, not a terrain wildcard, that
  * disagrees with its orbit's most common value (or, when the minority
  * is an immutable off-region image, any in-region member of the broken
  * orbit). Then pills and bases: a stray object whose orbit is mostly
@@ -352,16 +359,13 @@ function score(map, fixed) {
  *
  * fixed is passed through to score(): with it, the flaw is judged under
  * the given mode about the given axes instead of the best available. */
-function find_flaw(map, fixed) {
-	let s = score(map, fixed);
+function find_flaw(map, fixed, strict = false) {
+	let s = score(map, fixed, strict);
 	if (!s || s.flaws === 0) return s && { ...s, flaw: null };
 	let tf = group_about(s.mode, s.S, s.T);
 
 	let in_reg = (x, y) => x >= LO && x < HI && y >= LO && y < HI;
-	let occ = new Set();
-	for (let list of [map.pills, map.bases, map.starts]) {
-		for (let o of list) occ.add(o.y * SIZE + o.x);
-	}
+	let occ = terrain_wildcards(map, strict);
 
 	let seen = new Uint8Array(SIZE * SIZE);
 	for (let y = LO; y < HI; y++) {

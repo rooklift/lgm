@@ -67,6 +67,7 @@ let show_sprites = true; /* real tile art at sprite-capable zooms (View menu) */
 /* Old Mac BMAP maps come in two layouts two squares apart; off means read
  * them all the way Bolo 0.99 did (File menu). */
 let detect_legacy_phase = true;
+let strict_symmetry_checks = false;
 let sym_mode = null; /* null | "h" | "v" | "quad" | "rot180" | "rot90" */
 let sym_parity = { x: "odd", y: "odd" }; /* "odd": axis through tile 128; "even": between 127 and 128 */
 
@@ -816,7 +817,7 @@ function set_symmetry(mode, quiet) {
  * standard axes — as one undoable step, only when a shift is needed,
  * so an already-centred file loads clean. */
 function auto_detect_symmetry() {
-	let found = BoloSym.detect(doc);
+	let found = BoloSym.detect(doc, strict_symmetry_checks);
 	if (!found) return;
 	let snap = snapshot(); /* pre-change: symmetry still off here */
 	sym_mode = found.mode;
@@ -832,7 +833,7 @@ function auto_detect_symmetry() {
 /* On demand: how far is this map from perfect symmetry? Reports the
  * minimum-edit count for the best mode, plus every mode's own score. */
 function cmd_symmetry_score() {
-	let s = BoloSym.score(doc);
+	let s = BoloSym.score(doc, undefined, strict_symmetry_checks);
 	if (!s) {
 		status_msg("empty map — nothing to score");
 		return;
@@ -849,7 +850,7 @@ function cmd_symmetry_score() {
 /* On demand: locate one concrete flaw — a tile the best mode would
  * edit — and name it in the status bar. */
 function cmd_find_flaw() {
-	report_flaw(BoloSym.find_flaw(doc));
+	report_flaw(BoloSym.find_flaw(doc, undefined, strict_symmetry_checks));
 }
 
 /* On demand: the same, but judged as the selected symmetry mode about
@@ -861,7 +862,7 @@ function cmd_find_flaw_selected() {
 	}
 	let S = sym_parity.x === "even" ? 255 : 256;
 	let T = sym_parity.y === "even" ? 255 : 256;
-	report_flaw(BoloSym.find_flaw(doc, { mode: sym_mode, S, T }));
+	report_flaw(BoloSym.find_flaw(doc, { mode: sym_mode, S, T }, strict_symmetry_checks));
 }
 
 function report_flaw(s) {
@@ -1677,6 +1678,7 @@ api.on_settings(s => {
 	bases_as_circles = s.basesAsCircles !== false;
 	show_sprites = s.showSprites !== false;
 	detect_legacy_phase = s.detectLegacyPhase !== false;
+	strict_symmetry_checks = s.strict_symmetry_checks === true;
 	request_draw();
 });
 
@@ -1766,6 +1768,7 @@ api.on_menu(cmd => {
 		case "toggle-pill-range": show_pill_range = !show_pill_range; request_draw(); break;
 		case "toggle-base-circles": bases_as_circles = !bases_as_circles; request_draw(); break;
 		case "toggle-legacy-phase": detect_legacy_phase = !detect_legacy_phase; break;
+		case "toggle-strict-symmetry-checks": strict_symmetry_checks = !strict_symmetry_checks; break;
 		case "zoom-in": zoom_step(1); break;
 		case "zoom-out": zoom_step(-1); break;
 		case "zoom-fit": zoom_fit(); break;

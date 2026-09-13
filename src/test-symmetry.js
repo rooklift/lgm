@@ -335,6 +335,37 @@ check(r2.dir(0) === 8 && r2.dir(4) === 12, "R2 dir: E->W, N->S");
 	check(s && s.flaws > 0, "score fixed: off-centre quad flawed about the board's axes");
 }
 
+/* Strict checks include terrain under pills and bases in every judgement. */
+for (let kind of ["pills", "bases"]) {
+	let m = { grid: new Uint8Array(256 * 256).fill(0xff), pills: [], bases: [], starts: [] };
+	m[kind].push({ x: 100, y: 100 }, { x: 156, y: 156 });
+	m.grid[100 * 256 + 100] = 7;
+	m.grid[156 * 256 + 156] = 4;
+	check(BoloSym.detect(m)?.mode === "rot180", `${kind}: loose detection excuses covered terrain`);
+	check(BoloSym.detect(m, true) === null, `${kind}: strict detection rejects covered terrain mismatch`);
+	for (let fixed of [undefined, { mode: "rot180", S: 256, T: 256 }]) {
+		check(BoloSym.score(m, fixed).flaws === 0, `${kind}: loose score excuses covered terrain`);
+		check(BoloSym.score(m, fixed, true).flaws === 1, `${kind}: strict score counts covered terrain`);
+		check(BoloSym.find_flaw(m, fixed).flaw === null, `${kind}: loose find has no flaw`);
+		let f = BoloSym.find_flaw(m, fixed, true).flaw;
+		check(f?.kind === "terrain" && m[kind].some(o => o.x === f.x && o.y === f.y),
+			`${kind}: strict find locates the covered terrain flaw`);
+	}
+	m.grid[156 * 256 + 156] = 7;
+	check(BoloSym.detect(m, true)?.mode === "rot180", `${kind}: matching covered terrain passes strict detection`);
+	check(BoloSym.find_flaw(m, undefined, true).flaw === null, `${kind}: repaired covered terrain has no strict flaw`);
+}
+
+/* Spawn terrain keeps its existing exemption with strict checks enabled. */
+{
+	let m = { grid: new Uint8Array(256 * 256).fill(0xff), pills: [], bases: [], starts: [{ x: 156, y: 156 }] };
+	m.grid[100 * 256 + 100] = 7;
+	m.grid[156 * 256 + 156] = 4;
+	check(BoloSym.detect(m, true)?.mode === "rot180", "strict detection still excuses spawn terrain");
+	check(BoloSym.score(m, undefined, true).flaws === 0, "strict score still excuses spawn terrain");
+	check(BoloSym.find_flaw(m, undefined, true).flaw === null, "strict find still excuses spawn terrain");
+}
+
 if (failures === 0) {
 	console.log("symmetry tests: PASS");
 } else {
