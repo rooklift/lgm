@@ -931,6 +931,15 @@ function cmd_count_trees() {
 	status_msg(`${count} tree${count === 1 ? "" : "s"} on the map`, 5000);
 }
 
+/* Count mined tiles, including under bases or pillboxes */
+function cmd_count_mines() {
+	let count = 0;
+	for (let t of doc.grid) {
+		if (t >= 10 && t <= 15) count++;
+	}
+	status_msg(`${count} mine${count === 1 ? "" : "s"} on the map`, 5000);
+}
+
 /* Manual axis-parity override (sets both axes; recentres to match). */
 function set_parity(p) {
 	if (!sym_mode) return;
@@ -1762,6 +1771,7 @@ api.on_menu(cmd => {
 		case "pill-speeds": cmd_pill_speeds(); break;
 		case "count-nonstandard": cmd_count_nonstandard(); break;
 		case "count-trees": cmd_count_trees(); break;
+		case "count-mines": cmd_count_mines(); break;
 		case "apply-all-fixes-fast": cmd_apply_all_fixes({ speed: 50 }); break;
 		case "apply-all-fixes-slow": cmd_apply_all_fixes({ speed: 100 }); break;
 		case "toggle-sprites": show_sprites = !show_sprites; request_draw(); break;

@@ -100,6 +100,7 @@ function build_menu() {
 				{ label: "Count non-standard objects", click: () => send("count-nonstandard") },
 				{ type: "separator" },
 				{ label: "Count trees", click: () => send("count-trees") },
+				{ label: "Count mines", click: () => send("count-mines") },
 			],
 		},
 		{
