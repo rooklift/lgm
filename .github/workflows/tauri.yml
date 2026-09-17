@@ -1,6 +1,7 @@
-# Builds the Tauri version of LGM for Windows, macOS and Linux. Runs on
-# demand (Actions tab, "Run workflow") and on tags starting with "v"; the
-# installers are attached to the run as artifacts.
+# Builds the Tauri version of LGM as a clickable app for Windows, macOS
+# and Linux: a single .exe, an LGM.app, and an AppImage. Runs on demand
+# (Actions tab, "Run workflow") and on tags starting with "v"; the apps
+# are attached to the run as artifacts.
 name: Tauri build
 
 on:
@@ -16,13 +17,10 @@ jobs:
         include:
           - os: windows-latest
             name: windows
-            args: ""
           - os: macos-latest
             name: macos
-            args: "--target universal-apple-darwin"
           - os: ubuntu-22.04
             name: linux
-            args: ""
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -45,18 +43,37 @@ jobs:
         with:
           workspaces: src-tauri
 
-      - name: Build
+      # Windows: the bare exe is the app; the page and sprites are compiled
+      # into it, and it runs on the WebView2 runtime Windows 10/11 ships with.
+      - name: Build (Windows)
+        if: matrix.name == 'windows'
         working-directory: src-tauri
-        run: npx --yes @tauri-apps/cli@2 build ${{ matrix.args }}
+        run: |
+          npx --yes @tauri-apps/cli@2 build --no-bundle
+          mkdir out
+          copy target\release\LGM.exe out\
+
+      # macOS: one LGM.app for Intel and Apple silicon. Zipped with ditto so
+      # the executable bits survive the artifact upload (which drops them).
+      - name: Build (macOS)
+        if: matrix.name == 'macos'
+        working-directory: src-tauri
+        run: |
+          npx --yes @tauri-apps/cli@2 build --target universal-apple-darwin --bundles app
+          mkdir out
+          ditto -c -k --keepParent target/universal-apple-darwin/release/bundle/macos/LGM.app out/LGM-macos.zip
+
+      # Linux: an AppImage, tarred to keep it executable through the upload.
+      - name: Build (Linux)
+        if: matrix.name == 'linux'
+        working-directory: src-tauri
+        run: |
+          npx --yes @tauri-apps/cli@2 build --bundles appimage
+          mkdir out
+          tar -C target/release/bundle/appimage -czf out/LGM-linux.tar.gz LGM_1.0.0_amd64.AppImage
 
       - uses: actions/upload-artifact@v4
         with:
           name: lgm-${{ matrix.name }}
-          path: |
-            src-tauri/target/**/release/bundle/msi/*.msi
-            src-tauri/target/**/release/bundle/nsis/*.exe
-            src-tauri/target/**/release/bundle/dmg/*.dmg
-            src-tauri/target/**/release/bundle/deb/*.deb
-            src-tauri/target/**/release/bundle/rpm/*.rpm
-            src-tauri/target/**/release/bundle/appimage/*.AppImage
+          path: src-tauri/out/*
           if-no-files-found: error

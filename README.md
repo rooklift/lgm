@@ -8,14 +8,14 @@ The terrain sprites in `src/sprites/`, and the neighbour rules in `src/sprites.j
 
 ## Tauri build
 
-`src-tauri/` holds a [Tauri](https://tauri.app) version of the editor: the same `src/` page, with the Electron main process replaced by a small Rust program (`src-tauri/src/lib.rs`) and `src/api.js` giving the renderer the same `window.api` it gets from `preload.js`. It builds a normal installer (`.msi`/`.exe`, `.dmg`, `.deb`/`.rpm`/`.AppImage`) with no Electron needed.
+`src-tauri/` holds a [Tauri](https://tauri.app) version of the editor: the same `src/` page, with the Electron main process replaced by a small Rust program (`src-tauri/src/lib.rs`) and `src/api.js` giving the renderer the same `window.api` it gets from `preload.js`. It builds a clickable app with no Electron needed: on Windows a single `LGM.exe` with the page compiled in, on macOS an `LGM.app`, on Linux an AppImage.
 
-To build it you need [Rust](https://rustup.rs), Node (for the Tauri CLI), and on Linux the [WebKitGTK packages](https://tauri.app/start/prerequisites/). Then:
+The GitHub Actions workflow in `.github/workflows/tauri.yml` builds all three on demand (Actions tab, "Run workflow") or on a `v*` tag, and attaches them to the run as artifacts. The macOS app is unsigned, so the first launch needs right-click → Open.
+
+To build locally you need [Rust](https://rustup.rs), Node (for the Tauri CLI), and on Linux the [WebKitGTK packages](https://tauri.app/start/prerequisites/). Then:
 
 ```
 cd src-tauri
 npx @tauri-apps/cli@2 dev      # run it
-npx @tauri-apps/cli@2 build    # installers land in src-tauri/target/release/bundle/
+npx @tauri-apps/cli@2 build    # the app lands under src-tauri/target/release/
 ```
-
-The GitHub Actions workflow in `.github/workflows/tauri.yml` builds all three platforms on demand (Actions tab, "Run workflow") or on a `v*` tag, and attaches the installers to the run.
