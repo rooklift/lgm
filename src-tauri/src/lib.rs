@@ -270,6 +270,13 @@ fn show_error(app: AppHandle, title: String, message: String) {
 	app.dialog().message(message).title(title).kind(MessageDialogKind::Error).show(|_| {});
 }
 
+/* A keyboard shortcut handled by the page (Windows only, see build_menu),
+ * routed through the same path as a click on the menu item. */
+#[tauri::command]
+fn menu_shortcut(app: AppHandle, id: String) {
+	on_menu(&app, &id);
+}
+
 /* destroy() skips the close-requested event, so the dirty check can't re-fire */
 #[tauri::command]
 fn close_confirmed(window: WebviewWindow) {
@@ -278,8 +285,21 @@ fn close_confirmed(window: WebviewWindow) {
 
 /* ---------- menu ---------- */
 
+/* On Windows the webview holds keyboard focus and eats the key events
+ * before the menu's accelerator table sees them, so the shortcuts there are
+ * handled by the page (src/api.js) and routed back through menu_shortcut.
+ * The menu still shows the hint: Win32 renders text after a tab in the
+ * accelerator column, with no binding behind it. Elsewhere the native
+ * accelerators work, and the page leaves the keys alone. */
 fn build_menu(app: &AppHandle, state: &AppState) -> tauri::Result<Menu<tauri::Wry>> {
-	let item = |id: &str, text: &str, accel: Option<&str>| MenuItem::with_id(app, id, text, true, accel);
+	let item = |id: &str, text: &str, accel: Option<&str>| {
+		#[cfg(windows)]
+		let (text, accel) = match accel {
+			Some(a) => (format!("{text}\t{}", a.replace("CmdOrCtrl", "Ctrl")), None::<&str>),
+			None => (text.to_owned(), None::<&str>),
+		};
+		MenuItem::with_id(app, id, text, true, accel)
+	};
 	let sep = || PredefinedMenuItem::separator(app);
 	let mut toggles = Vec::new();
 	let mut check = |id: &str| -> tauri::Result<CheckMenuItem<tauri::Wry>> {
@@ -459,6 +479,7 @@ pub fn run() {
 			confirm_discard,
 			show_error,
 			close_confirmed,
+			menu_shortcut,
 		])
 		.build(tauri::generate_context!())
 		.expect("error while building the application")
