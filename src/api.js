@@ -78,6 +78,28 @@ if (!window.api && window.__TAURI__) {
 		/* a map opened from the Finder (macOS) after launch */
 		listen("open-file", e => open_path(e.payload, true));
 
+		/* On Windows the webview keeps the key events from ever reaching the
+		 * native menu's accelerators (see build_menu in lib.rs), so the
+		 * shortcuts are recognised here and sent back to the same handler a
+		 * menu click uses. Elsewhere the native accelerators work, and doing
+		 * it here too would run each command twice. */
+		if (/Windows/.test(navigator.userAgent)) {
+			const SHORTCUTS = {
+				"KeyN": "new", "KeyO": "open", "KeyS": "save", "shift+KeyS": "save-as",
+				"KeyZ": "undo", "KeyY": "redo", "KeyQ": "quit",
+				"Equal": "zoom-in", "NumpadAdd": "zoom-in",
+				"Minus": "zoom-out", "NumpadSubtract": "zoom-out",
+				"Digit0": "zoom-fit", "Numpad0": "zoom-fit",
+			};
+			window.addEventListener("keydown", e => {
+				if (!e.ctrlKey || e.altKey || e.metaKey) return;
+				let id = SHORTCUTS[(e.shiftKey ? "shift+" : "") + e.code];
+				if (!id) return;
+				e.preventDefault();
+				if (!e.repeat) invoke("menu_shortcut", { id });
+			}, true);
+		}
+
 		/* Tauri doesn't follow document.title, which the renderer uses to
 		 * show the file name and the dirty marker. */
 		let title_el = document.querySelector("title");
