@@ -362,6 +362,7 @@ fn build_menu(app: &AppHandle, state: &AppState) -> tauri::Result<Menu<tauri::Wr
 		&sep()?,
 		&item("count-trees", "Count trees", None)?,
 		&item("count-mines", "Count mines", None)?,
+		&item("count-land", "Count land tiles", None)?,
 	])?;
 	let view = Submenu::with_items(app, "&View", true, &[
 		&item("zoom-in", "Zoom in", Some("CmdOrCtrl+="))?,

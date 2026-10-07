@@ -940,6 +940,15 @@ function cmd_count_mines() {
 	status_msg(`${count} mine${count === 1 ? "" : "s"} on the map`, 5000);
 }
 
+/* Count land tiles: everything except deep sea, river and boat. */
+function cmd_count_land() {
+	let count = 0;
+	for (let t of doc.grid) {
+		if (t !== DEEP_SEA && t !== 1 && t !== 9) count++;
+	}
+	status_msg(`${count} land tile${count === 1 ? "" : "s"} on the map`, 5000);
+}
+
 /* Manual axis-parity override (sets both axes; recentres to match). */
 function set_parity(p) {
 	if (!sym_mode) return;
@@ -1772,6 +1781,7 @@ api.on_menu(cmd => {
 		case "count-nonstandard": cmd_count_nonstandard(); break;
 		case "count-trees": cmd_count_trees(); break;
 		case "count-mines": cmd_count_mines(); break;
+		case "count-land": cmd_count_land(); break;
 		case "apply-all-fixes-fast": cmd_apply_all_fixes({ speed: 50 }); break;
 		case "apply-all-fixes-slow": cmd_apply_all_fixes({ speed: 100 }); break;
 		case "toggle-sprites": show_sprites = !show_sprites; request_draw(); break;

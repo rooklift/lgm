@@ -101,6 +101,7 @@ function build_menu() {
 				{ type: "separator" },
 				{ label: "Count trees", click: () => send("count-trees") },
 				{ label: "Count mines", click: () => send("count-mines") },
+				{ label: "Count land tiles", click: () => send("count-land") },
 			],
 		},
 		{
