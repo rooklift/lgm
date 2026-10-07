@@ -85,6 +85,7 @@ function build_menu() {
 				{ label: "Apply all fixes above (wait 100)", click: () => send("apply-all-fixes-slow") },
 				{ type: "separator" },
 				{ label: "Fix spawn directions", click: () => send("fix-start-dirs") },
+				{ label: "Delete all mines", click: () => send("delete-mines") },
 				{ label: "Buffer the sea", click: () => send("buffer-sea") },
 
 			],

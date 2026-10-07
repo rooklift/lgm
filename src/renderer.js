@@ -1544,6 +1544,30 @@ function cmd_buffer_sea(quiet) {
 	return true;
 }
 
+/* Strip the mine from every mined tile, leaving the terrain beneath. */
+function cmd_delete_mines(quiet) {
+	let to_clear = [];
+	for (let i = 0; i < doc.grid.length; i++) {
+		let t = doc.grid[i];
+		if (t >= 10 && t <= 15) to_clear.push(i);
+	}
+	if (!to_clear.length) {
+		if (!quiet) status_msg("no mines on the map");
+		return false;
+	}
+	if (!quiet) push_undo();
+	for (let i of to_clear) doc.grid[i] -= 8;
+	rebuild_offscreen();
+	if (!quiet) {
+		set_dirty(true);
+		render_props();
+		refresh_hover_status();
+		request_draw();
+		status_msg(`deleted ${to_clear.length} mine${to_clear.length === 1 ? "" : "s"}`);
+	}
+	return true;
+}
+
 /* Run every fix as one undoable step. */
 function cmd_apply_all_fixes(pill_overrides) {
 	let snap = snapshot();
@@ -1774,6 +1798,7 @@ api.on_menu(cmd => {
 		case "reset-pills-slow": cmd_reset_objects("pill", "pillboxes", false, { speed: 100 }); break;
 		case "reset-bases": cmd_reset_objects("base", "bases"); break;
 		case "buffer-sea": cmd_buffer_sea(); break;
+		case "delete-mines": cmd_delete_mines(); break;
 		case "count-flaws": cmd_symmetry_score(); break;
 		case "find-flaw": cmd_find_flaw(); break;
 		case "find-flaw-selected": cmd_find_flaw_selected(); break;
